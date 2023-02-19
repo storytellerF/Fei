@@ -1,6 +1,12 @@
 package com.storyteller_f.fei
 
+import android.content.ComponentName
+import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Bundle
+import android.os.IBinder
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +29,28 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        val intent = Intent(this, FeiService::class.java)
+        startService(intent)
+        bindService(intent, connection, 0)
+    }
+
+    var fei: FeiService.Fei? = null
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            Toast.makeText(this@MainActivity, "服务已连接", Toast.LENGTH_SHORT).show()
+            val feiLocal = service as FeiService.Fei
+            Log.i(TAG, "onServiceConnected: $feiLocal")
+            fei = feiLocal
+            feiLocal.start()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            Toast.makeText(this@MainActivity, "服务已关闭", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    companion object {
+        private const val TAG = "MainActivity"
     }
 }
 

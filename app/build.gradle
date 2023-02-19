@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId "com.storyteller_f.fei"
-        minSdk 24
+        minSdk 26
         targetSdk 33
         versionCode 1
         versionName "1.0"
@@ -42,6 +42,10 @@ android {
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
+            pickFirsts += ['META-INF/*', '/META-INF/io.netty.versions.properties']
+        }
+        jniLibs {
+            pickFirsts += ['META-INF/*']
         }
     }
 }
@@ -61,4 +65,20 @@ dependencies {
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
     debugImplementation "androidx.compose.ui:ui-tooling:$compose_version"
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
+
+    //ktor
+    def ktor_version = "2.2.2"
+    implementation "io.ktor:ktor-server-core-jvm:" + ktor_version
+    implementation "io.ktor:ktor-server-netty-jvm:$ktor_version"
+
+    implementation("io.ktor:ktor-server-webjars-jvm:$ktor_version")
+    implementation("org.webjars:jquery:3.6.1")
+    implementation("io.ktor:ktor-server-host-common-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-status-pages-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktor_version")
+    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-thymeleaf-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-html-builder:$ktor_version")
+    implementation("io.ktor:ktor-server-websockets:$ktor_version")
+    implementation("io.ktor:ktor-server-call-logging:$ktor_version")
 }
