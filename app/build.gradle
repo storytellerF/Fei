@@ -68,17 +68,19 @@ dependencies {
 
     //ktor
     def ktor_version = "2.2.2"
-    implementation "io.ktor:ktor-server-core-jvm:" + ktor_version
-    implementation "io.ktor:ktor-server-netty-jvm:$ktor_version"
+    implementation "io.ktor:ktor-server-core:" + ktor_version
+    implementation "io.ktor:ktor-server-netty:$ktor_version"
 
-    implementation("io.ktor:ktor-server-webjars-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-webjars:$ktor_version")
     implementation("org.webjars:jquery:3.6.1")
-    implementation("io.ktor:ktor-server-host-common-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-status-pages-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktor_version")
-    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-thymeleaf-jvm:$ktor_version")
+    implementation("io.ktor:ktor-server-host-common:$ktor_version")
+    implementation("io.ktor:ktor-server-status-pages:$ktor_version")
+    implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+    implementation("io.ktor:ktor-server-thymeleaf:$ktor_version")
     implementation("io.ktor:ktor-server-html-builder:$ktor_version")
     implementation("io.ktor:ktor-server-websockets:$ktor_version")
     implementation("io.ktor:ktor-server-call-logging:$ktor_version")
+    implementation("io.ktor:ktor-server-partial-content:$ktor_version")
+    implementation("io.ktor:ktor-server-auto-head-response:$ktor_version")
 }

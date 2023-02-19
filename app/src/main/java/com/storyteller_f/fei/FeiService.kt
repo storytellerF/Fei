@@ -3,6 +3,7 @@ package com.storyteller_f.fei
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
@@ -10,15 +11,19 @@ import android.widget.Toast
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.autohead.*
 import io.ktor.server.plugins.callloging.*
+import io.ktor.server.plugins.partialcontent.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.server.websocket.*
-import java.time.Duration
+import io.ktor.server.thymeleaf.*
+import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
+import java.io.File
 
 class FeiService : Service() {
     private var binder: Fei? = null
@@ -27,7 +32,7 @@ class FeiService : Service() {
         assert(binder == null) {
             "binder 重复创建"
         }
-        return Fei().also {
+        return Fei(this).also {
             binder = it
         }
     }
@@ -60,7 +65,8 @@ class FeiService : Service() {
         binder?.stop()
     }
 
-    class Fei : Binder() {
+    class Fei(feiService: FeiService) : Binder() {
+        val path = feiService.filesDir
         private var server: ApplicationEngine? = null
         fun start() {
             Log.d(TAG, "start() called")
@@ -68,7 +74,7 @@ class FeiService : Service() {
 
                 this.server = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
                     plugPlugins()
-                    configureRouting()
+                    configureRouting(path)
                 }.start(wait = false)
             } catch (th: Throwable) {
                 Log.e(TAG, "start: ${th.localizedMessage}", th)
@@ -77,8 +83,22 @@ class FeiService : Service() {
         }
 
         private fun Application.plugPlugins() {
-            install(StatusPages)
+            install(StatusPages) {
+                exception<Throwable> { call: ApplicationCall, cause->
+                    call.respondText(cause.localizedMessage, status = HttpStatusCode.InternalServerError)
+                    Log.e(TAG, "plugPlugins: ", cause)
+                }
+            }
             install(CallLogging)
+            install(Thymeleaf) {
+                setTemplateResolver(ClassLoaderTemplateResolver().apply {
+                    prefix = "templates/"
+                    suffix = ".html"
+                    characterEncoding = "utf-8"
+                })
+            }
+            install(PartialContent)
+            install(AutoHeadResponse)
         }
 
         fun stop() {
@@ -98,10 +118,22 @@ class FeiService : Service() {
     }
 }
 
-private fun Application.configureRouting() {
+data class SharedFile(val id: String, val uri: Uri)
+
+private fun Application.configureRouting(path: File) {
     routing {
         get("/") {
-            call.respond("hello")
+            call.respond(ThymeleafContent("index", mapOf("shares" to "1")))
+        }
+        get("/{count}") {
+            val s = call.parameters["count"]
+            val file = File(path,"fb2087ed475c45aec97cf9730ee7f7cd.jpg")
+            call.response.header(
+                HttpHeaders.ContentDisposition,
+                ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, "$s.png")
+                    .toString()
+            )
+            call.respondFile(file)
         }
     }
 }
