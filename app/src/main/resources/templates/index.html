@@ -1,21 +1,48 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Document</title>
 </head>
-<body>
-<p>hello</p>
-<div>
-    <ul>
-        <li th:each="share : ${shares}">
-            <a th:href="${share}" th:text="${share}"></a>
-        </li>
-    </ul>
 
-</div>
+<body>
+    <p>hello</p>
+    <div>
+        <ul>
+            <li th:each="share : ${shares}">
+                <a th:href="${share}" th:text="${share}"></a>
+            </li>
+        </ul>
+
+    </div>
+    <ul id="events"></ul>
+    <script>
+        var source = new EventSource('/sse');
+        var eventsUl = document.getElementById('events');
+        function logEvent(text) {
+            var li = document.createElement('li')
+            li.innerText = text;
+            eventsUl.appendChild(li);
+        }
+        source.addEventListener('message', function (e) {
+            logEvent('message:' + e.data);
+        }, false);
+        source.addEventListener('open', function (e) {
+            logEvent('open');
+        }, false);
+        source.addEventListener('error', function (e) {
+            if (e.readyState == EventSource.CLOSED) {
+                logEvent('closed');
+            } else {
+                logEvent('error');
+                console.log(e);
+            }
+        }, false);
+    </script>
 </body>
+
 </html>

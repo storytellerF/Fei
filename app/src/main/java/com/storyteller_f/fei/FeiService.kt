@@ -22,6 +22,11 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.thymeleaf.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.ObsoleteCoroutinesApi
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.broadcast
+import kotlinx.coroutines.channels.produce
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
 import java.io.File
 
@@ -68,12 +73,32 @@ class FeiService : Service() {
     class Fei(feiService: FeiService) : Binder() {
         val path = feiService.filesDir
         private var server: ApplicationEngine? = null
+        @OptIn(ExperimentalCoroutinesApi::class, ObsoleteCoroutinesApi::class)
         fun start() {
             Log.d(TAG, "start() called")
             try {
 
                 this.server = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
                     plugPlugins()
+                    val channel = produce {
+                        var n = 0
+                        while (true) {
+                            send(SseEvent("test$n"))
+                            kotlinx.coroutines.delay(1000)
+                            n++
+                        }
+                    }.broadcast()
+                    routing {
+                        get("/sse") {
+                            val events = channel.openSubscription()
+                            try {
+                                call.respondSse(events)
+                            } finally {
+                                events.cancel()
+                            }
+
+                        }
+                    }
                     configureRouting(path)
                 }.start(wait = false)
             } catch (th: Throwable) {
@@ -117,7 +142,7 @@ class FeiService : Service() {
         private const val foreground_notification_id = 10
     }
 }
-
+data class SseEvent(val data: String, val event: String? = null, val id: String?= null)
 data class SharedFile(val id: String, val uri: Uri)
 
 private fun Application.configureRouting(path: File) {
@@ -125,6 +150,7 @@ private fun Application.configureRouting(path: File) {
         get("/") {
             call.respond(ThymeleafContent("index", mapOf("shares" to "1")))
         }
+
         get("/{count}") {
             val s = call.parameters["count"]
             val file = File(path,"fb2087ed475c45aec97cf9730ee7f7cd.jpg")
@@ -134,6 +160,25 @@ private fun Application.configureRouting(path: File) {
                     .toString()
             )
             call.respondFile(file)
+        }
+    }
+}
+
+suspend fun ApplicationCall.respondSse(events: ReceiveChannel<SseEvent>) {
+    response.cacheControl(CacheControl.NoCache(null))
+    respondTextWriter(contentType = ContentType.Text.EventStream) {
+        for (event in events) {
+            if (event.id != null) {
+                write("id: ${event.id}\n")
+            }
+            if (event.event != null) {
+                write("event: ${event.event}\n")
+            }
+            for (dataLine in event.data.lines()) {
+                write("data: $dataLine\n")
+            }
+            write("\n")
+            flush()
         }
     }
 }
