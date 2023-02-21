@@ -29,10 +29,12 @@
             eventsUl.appendChild(li);
         }
         source.addEventListener('message', function (e) {
-            logEvent('message:' + e.data);
+            if (e.event === 'ping') return
+            if (e.data === 'refresh') {
+                location.reload();
+            }
         }, false);
         source.addEventListener('open', function (e) {
-            logEvent('open');
         }, false);
         source.addEventListener('error', function (e) {
             if (e.readyState == EventSource.CLOSED) {

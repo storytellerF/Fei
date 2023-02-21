@@ -24,6 +24,7 @@ import io.ktor.server.routing.*
 import io.ktor.server.thymeleaf.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.ObsoleteCoroutinesApi
+import kotlinx.coroutines.channels.BroadcastChannel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.broadcast
 import kotlinx.coroutines.channels.produce
@@ -72,6 +73,7 @@ class FeiService : Service() {
 
     class Fei : Binder() {
         private var server: ApplicationEngine? = null
+        var channel: BroadcastChannel<SseEvent>? = null
         @OptIn(ExperimentalCoroutinesApi::class, ObsoleteCoroutinesApi::class)
         fun start() {
             Log.d(TAG, "start() called")
@@ -79,17 +81,17 @@ class FeiService : Service() {
 
                 this.server = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
                     plugPlugins()
-                    val channel = produce {
+                    channel = produce {
                         var n = 0
                         while (true) {
-                            send(SseEvent("test$n"))
+                            send(SseEvent("$n", "ping"))
                             kotlinx.coroutines.delay(1000)
                             n++
                         }
                     }.broadcast()
                     routing {
                         get("/sse") {
-                            val events = channel.openSubscription()
+                            val events = channel!!.openSubscription()
                             try {
                                 call.respondSse(events)
                             } finally {

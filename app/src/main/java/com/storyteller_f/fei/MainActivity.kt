@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @OptIn(ObsoleteCoroutinesApi::class)
     private suspend fun saveFile(extension: String?, uri: Uri) {
         val file = try {
             withContext(Dispatchers.IO) {
@@ -84,6 +86,7 @@ class MainActivity : ComponentActivity() {
         }.let {
             shares.emit(it)
         }
+        fei?.channel?.send(SseEvent("refresh"))
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
