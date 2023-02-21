@@ -37,7 +37,7 @@ class FeiService : Service() {
         assert(binder == null) {
             "binder 重复创建"
         }
-        return Fei(this).also {
+        return Fei().also {
             binder = it
         }
     }
@@ -70,8 +70,7 @@ class FeiService : Service() {
         binder?.stop()
     }
 
-    class Fei(feiService: FeiService) : Binder() {
-        val path = feiService.filesDir
+    class Fei : Binder() {
         private var server: ApplicationEngine? = null
         @OptIn(ExperimentalCoroutinesApi::class, ObsoleteCoroutinesApi::class)
         fun start() {
@@ -99,7 +98,7 @@ class FeiService : Service() {
 
                         }
                     }
-                    configureRouting(path)
+                    configureRouting()
                 }.start(wait = false)
             } catch (th: Throwable) {
                 Log.e(TAG, "start: ${th.localizedMessage}", th)
@@ -143,17 +142,19 @@ class FeiService : Service() {
     }
 }
 data class SseEvent(val data: String, val event: String? = null, val id: String?= null)
-data class SharedFile(val id: String, val uri: Uri)
+data class SharedFileInfo(val id: String, val uri: Uri)
 
-private fun Application.configureRouting(path: File) {
+private fun Application.configureRouting() {
     routing {
         get("/") {
-            call.respond(ThymeleafContent("index", mapOf("shares" to "1")))
+            call.respond(ThymeleafContent("index", mapOf("shares" to shares.value.mapIndexed { index, s ->
+                index.toString()
+            })))
         }
 
-        get("/{count}") {
-            val s = call.parameters["count"]
-            val file = File(path,"fb2087ed475c45aec97cf9730ee7f7cd.jpg")
+        get("/shares/{count}") {
+            val s = call.parameters["count"]?.toInt() ?: return@get
+            val file = File(shares.value[s])
             call.response.header(
                 HttpHeaders.ContentDisposition,
                 ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, "$s.png")

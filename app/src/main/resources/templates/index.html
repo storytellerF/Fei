@@ -14,7 +14,7 @@
     <div>
         <ul>
             <li th:each="share : ${shares}">
-                <a th:href="${share}" th:text="${share}"></a>
+                <a th:href="@{'shares/' + ${share}}" th:text="${share}"></a>
             </li>
         </ul>
 
