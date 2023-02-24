@@ -12,6 +12,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -42,6 +44,14 @@ import java.io.File
 
 val shares = MutableStateFlow<List<String>>(listOf())
 
+fun fresh() {
+    File(System.getProperty("java.io.tmpdir", ".")).listFiles()?.let {
+        shares.value = it.map { file ->
+            file.absolutePath
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
     private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         addFile(uri)
@@ -60,7 +70,7 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ObsoleteCoroutinesApi::class)
     private suspend fun saveFile(extension: String?, uri: Uri) {
-        val file = try {
+        try {
             withContext(Dispatchers.IO) {
                 val tempFile = File.createTempFile("file-", ".$extension")
                 val byteArray = ByteArray(1024)
@@ -81,17 +91,18 @@ class MainActivity : ComponentActivity() {
             null
         } ?: return
 
-        shares.value.toMutableList().apply {
-            add(file.absolutePath)
-        }.let {
-            shares.emit(it)
-        }
+        fresh()
         fei?.channel?.send(SseEvent("refresh"))
     }
 
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val deleteItem: (String) -> Unit  = { path ->
+            File(path).delete()
+            fresh()
+            fei?.channel?.trySend(SseEvent(data = "refresh"))
+        }
         setContent {
             FeiTheme {
                 Scaffold(topBar = {
@@ -128,7 +139,7 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                             .padding(paddingValues), color = MaterialTheme.colorScheme.background
                     ) {
-                        Main(shares)
+                        Main(shares, deleteItem)
                     }
                 }
 
@@ -154,18 +165,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        fresh()
+    }
+
     companion object {
         private const val TAG = "MainActivity"
     }
 }
 
 @Composable
-fun Main(flow: StateFlow<List<String>>) {
+fun Main(flow: StateFlow<List<String>>, deleteItem: (String) -> Unit = {}) {
     val collectAsState by flow.collectAsState()
 
     LazyColumn(content = {
         items(collectAsState.size) {
-            SharedFile(collectAsState[it])
+            SharedFile(collectAsState[it], deleteItem)
         }
     })
 }
@@ -178,10 +194,16 @@ class ShareFilePreviewProvider : PreviewParameterProvider<String> {
 
 @Preview
 @Composable
-private fun SharedFile(@PreviewParameter(ShareFilePreviewProvider::class) info: String) {
-    Text(text = info, modifier = Modifier
+private fun SharedFile(@PreviewParameter(ShareFilePreviewProvider::class) info: String, deleteItem: (String) -> Unit = {}) {
+    Column(modifier = Modifier
+        .clickable {
+            deleteItem(info)
+        }
         .fillMaxWidth()
-        .padding(10.dp))
+        .padding(10.dp)) {
+        Text(text = info)
+    }
+
 }
 
 @Preview(showBackground = true)

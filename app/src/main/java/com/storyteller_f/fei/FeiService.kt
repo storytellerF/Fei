@@ -71,10 +71,11 @@ class FeiService : Service() {
         binder?.stop()
     }
 
+    @OptIn(ObsoleteCoroutinesApi::class)
     class Fei : Binder() {
         private var server: ApplicationEngine? = null
         var channel: BroadcastChannel<SseEvent>? = null
-        @OptIn(ExperimentalCoroutinesApi::class, ObsoleteCoroutinesApi::class)
+        @OptIn(ExperimentalCoroutinesApi::class)
         fun start() {
             Log.d(TAG, "start() called")
             try {
@@ -129,6 +130,8 @@ class FeiService : Service() {
 
         fun stop() {
             server?.stop()
+            channel?.cancel()
+            channel = null
         }
 
         fun restart(context: Context) {
