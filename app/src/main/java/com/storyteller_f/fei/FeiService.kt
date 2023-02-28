@@ -32,15 +32,10 @@ import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
 import java.io.File
 
 class FeiService : Service() {
-    private var binder: Fei? = null
+    private val binder = Fei(this)
     override fun onBind(intent: Intent): IBinder {
         Log.d(TAG, "onBind() called with: intent = $intent")
-        assert(binder == null) {
-            "binder 重复创建"
-        }
-        return Fei().also {
-            binder = it
-        }
+        return binder
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -68,11 +63,11 @@ class FeiService : Service() {
         Log.d(TAG, "onDestroy() called")
         super.onDestroy()
         stopForeground(STOP_FOREGROUND_REMOVE)
-        binder?.stop()
+        binder.stop()
     }
 
     @OptIn(ObsoleteCoroutinesApi::class)
-    class Fei : Binder() {
+    class Fei(private val feiService: FeiService) : Binder() {
         private var server: ApplicationEngine? = null
         var channel: BroadcastChannel<SseEvent>? = null
         @OptIn(ExperimentalCoroutinesApi::class)
@@ -112,7 +107,7 @@ class FeiService : Service() {
         private fun Application.plugPlugins() {
             install(StatusPages) {
                 exception<Throwable> { call: ApplicationCall, cause->
-                    call.respondText(cause.localizedMessage, status = HttpStatusCode.InternalServerError)
+                    call.respondText(cause.localizedMessage ?: cause.javaClass.canonicalName, status = HttpStatusCode.InternalServerError)
                     Log.e(TAG, "plugPlugins: ", cause)
                 }
             }
@@ -134,10 +129,10 @@ class FeiService : Service() {
             channel = null
         }
 
-        fun restart(context: Context) {
+        fun restart() {
             stop()
             start()
-            Toast.makeText(context, "restarted", Toast.LENGTH_SHORT).show()
+            Toast.makeText(feiService, "restarted", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -147,7 +142,7 @@ class FeiService : Service() {
     }
 }
 data class SseEvent(val data: String, val event: String? = null, val id: String?= null)
-data class SharedFileInfo(val id: String, val uri: Uri)
+data class SharedFileInfo(val id: String, val uri: String)
 
 private fun Application.configureRouting() {
     routing {
@@ -162,7 +157,7 @@ private fun Application.configureRouting() {
             val file = File(shares.value[s])
             call.response.header(
                 HttpHeaders.ContentDisposition,
-                ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, "$s.png")
+                ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, file.name)
                     .toString()
             )
             call.respondFile(file)

@@ -116,10 +116,12 @@ class MainActivity : ComponentActivity() {
                         actions = {
                             // RowScope here, so these icons will be placed horizontally
                             IconButton(onClick = {
+                                fei?.restart()
                             }) {
                                 Icon(Icons.Filled.Refresh, contentDescription = "Localized description")
                             }
                             IconButton(onClick = {
+                                fei?.stop()
                             }) {
                                 Icon(Icons.Filled.Delete, contentDescription = "Localized description")
                             }
