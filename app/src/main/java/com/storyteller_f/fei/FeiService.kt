@@ -1,7 +1,6 @@
 package com.storyteller_f.fei
 
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Binder
@@ -11,6 +10,7 @@ import android.widget.Toast
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toFile
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -29,7 +29,6 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.broadcast
 import kotlinx.coroutines.channels.produce
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
-import java.io.File
 
 class FeiService : Service() {
     private val binder = Fei(this)
@@ -70,6 +69,7 @@ class FeiService : Service() {
     class Fei(private val feiService: FeiService) : Binder() {
         private var server: ApplicationEngine? = null
         var channel: BroadcastChannel<SseEvent>? = null
+
         @OptIn(ExperimentalCoroutinesApi::class)
         fun start() {
             Log.d(TAG, "start() called")
@@ -96,7 +96,7 @@ class FeiService : Service() {
 
                         }
                     }
-                    configureRouting()
+                    configureRouting(feiService)
                 }.start(wait = false)
             } catch (th: Throwable) {
                 Log.e(TAG, "start: ${th.localizedMessage}", th)
@@ -106,7 +106,7 @@ class FeiService : Service() {
 
         private fun Application.plugPlugins() {
             install(StatusPages) {
-                exception<Throwable> { call: ApplicationCall, cause->
+                exception<Throwable> { call: ApplicationCall, cause ->
                     call.respondText(cause.localizedMessage ?: cause.javaClass.canonicalName, status = HttpStatusCode.InternalServerError)
                     Log.e(TAG, "plugPlugins: ", cause)
                 }
@@ -141,26 +141,30 @@ class FeiService : Service() {
         private const val foreground_notification_id = 10
     }
 }
-data class SseEvent(val data: String, val event: String? = null, val id: String?= null)
-data class SharedFileInfo(val id: String, val uri: String)
 
-private fun Application.configureRouting() {
+data class SseEvent(val data: String, val event: String? = null, val id: String? = null)
+data class SharedFileInfo(val uri: Uri, val name: String)
+
+private fun Application.configureRouting(feiService: FeiService) {
     routing {
         get("/") {
-            call.respond(ThymeleafContent("index", mapOf("shares" to shares.value.mapIndexed { index, s ->
+            call.respond(ThymeleafContent("index", mapOf("shares" to List(shares.value.size) { index ->
                 index.toString()
             })))
         }
 
         get("/shares/{count}") {
             val s = call.parameters["count"]?.toInt() ?: return@get
-            val file = File(shares.value[s])
+            val info = shares.value[s]
             call.response.header(
                 HttpHeaders.ContentDisposition,
-                ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, file.name)
+                ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, info.name)
                     .toString()
             )
-            call.respondFile(file)
+            val file = info.uri
+            if (file.scheme == "file") {
+                call.respondFile(file.toFile())
+            } else call.respondUri(feiService, file)
         }
     }
 }

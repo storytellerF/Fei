@@ -1,13 +1,14 @@
 package com.storyteller_f.fei
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.DocumentsContract
 import android.util.Log
-import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,24 +33,49 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-val shares = MutableStateFlow<List<String>>(listOf())
+val shares = MutableStateFlow<List<SharedFileInfo>>(listOf())
 
-fun fresh() {
-    File(System.getProperty("java.io.tmpdir", ".")).listFiles()?.let {
-        shares.value = it.map { file ->
-            file.absolutePath
+fun Context.cacheInvalid() {
+    val listFile = File(filesDir, "list.txt")
+    if (!listFile.exists()) listFile.createNewFile()
+    val readText = listFile.readText()
+
+    val list = readText.split("\n").filter {
+        it.isNotEmpty()
+    }.mapNotNull {
+        val toUri = it.toUri()
+        try {
+            val name = contentResolver.query(toUri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val columnIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    val string = cursor.getString(columnIndex)
+                    string
+                } else "unknown"
+            } ?: "unknown"
+            SharedFileInfo(toUri, name)
+        } catch (e: Exception) {
+            null
         }
     }
+    listFile.writeText(list.joinToString("\n") {
+        it.uri.toString()
+    })
+    val let = cacheDir.listFiles()?.let {
+        it.map { file ->
+            SharedFileInfo(file.toUri(), file.name)
+        }
+    }.orEmpty()
+    shares.tryEmit(let + list)
 }
 
 class MainActivity : ComponentActivity() {
@@ -57,15 +83,18 @@ class MainActivity : ComponentActivity() {
         addFile(uri)
     }
 
+    @OptIn(ObsoleteCoroutinesApi::class)
     private fun addFile(uri: Uri?) {
         uri ?: return
         Toast.makeText(this, "waiting", Toast.LENGTH_LONG).show()
-        val mimeType = contentResolver.getType(uri)
-        val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
         lifecycleScope.launch {
-            saveFile(extension, uri)
-            return@launch
+            withContext(Dispatchers.IO) {
+                File(filesDir, "list.txt").appendText(uri.toString() + "\n")
+                cacheInvalid()
+            }
+            fei?.channel?.send(SseEvent("refresh"))
         }
+
     }
 
     @OptIn(ObsoleteCoroutinesApi::class)
@@ -91,16 +120,16 @@ class MainActivity : ComponentActivity() {
             null
         } ?: return
 
-        fresh()
+        cacheInvalid()
         fei?.channel?.send(SseEvent("refresh"))
     }
 
     @OptIn(ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val deleteItem: (String) -> Unit  = { path ->
+        val deleteItem: (String) -> Unit = { path ->
             File(path).delete()
-            fresh()
+            cacheInvalid()
             fei?.channel?.trySend(SseEvent(data = "refresh"))
         }
         setContent {
@@ -169,7 +198,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        fresh()
+        cacheInvalid()
     }
 
     companion object {
@@ -178,7 +207,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Main(flow: StateFlow<List<String>>, deleteItem: (String) -> Unit = {}) {
+fun Main(flow: MutableStateFlow<List<SharedFileInfo>>, deleteItem: (String) -> Unit = {}) {
     val collectAsState by flow.collectAsState()
 
     LazyColumn(content = {
@@ -188,22 +217,24 @@ fun Main(flow: StateFlow<List<String>>, deleteItem: (String) -> Unit = {}) {
     })
 }
 
-class ShareFilePreviewProvider : PreviewParameterProvider<String> {
-    override val values: Sequence<String>
-        get() = sequenceOf("hello")
+class ShareFilePreviewProvider : PreviewParameterProvider<SharedFileInfo> {
+    override val values: Sequence<SharedFileInfo>
+        get() = sequenceOf(SharedFileInfo(Uri.EMPTY, "world"))
 
 }
 
 @Preview
 @Composable
-private fun SharedFile(@PreviewParameter(ShareFilePreviewProvider::class) info: String, deleteItem: (String) -> Unit = {}) {
+private fun SharedFile(@PreviewParameter(ShareFilePreviewProvider::class) info: SharedFileInfo, deleteItem: (String) -> Unit = {}) {
     Column(modifier = Modifier
         .clickable {
-            deleteItem(info)
+            //todo delete
+//            deleteItem(info)
         }
         .fillMaxWidth()
         .padding(10.dp)) {
-        Text(text = info)
+        Text(text = info.uri.toString())
+        Text(text = info.name)
     }
 
 }
@@ -212,6 +243,6 @@ private fun SharedFile(@PreviewParameter(ShareFilePreviewProvider::class) info: 
 @Composable
 fun DefaultPreview() {
     FeiTheme {
-        Main(MutableStateFlow(listOf("hello", "hello")))
+        Main(MutableStateFlow(ShareFilePreviewProvider().values.toList()))
     }
 }
