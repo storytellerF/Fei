@@ -25,9 +25,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -83,18 +81,22 @@ class MainActivity : ComponentActivity() {
         addFile(uri)
     }
 
-    @OptIn(ObsoleteCoroutinesApi::class)
     private fun addFile(uri: Uri?) {
         uri ?: return
         Toast.makeText(this, "waiting", Toast.LENGTH_LONG).show()
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                File(filesDir, "list.txt").appendText(uri.toString() + "\n")
-                cacheInvalid()
-            }
-            fei?.channel?.send(SseEvent("refresh"))
+            saveUri(uri)
         }
 
+    }
+
+    @OptIn(ObsoleteCoroutinesApi::class)
+    private suspend fun saveUri(uri: Uri) {
+        withContext(Dispatchers.IO) {
+            File(filesDir, "list.txt").appendText(uri.toString() + "\n")
+            cacheInvalid()
+        }
+        fei?.channel?.send(SseEvent("refresh"))
     }
 
     @OptIn(ObsoleteCoroutinesApi::class)
@@ -127,10 +129,21 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val deleteItem: (String) -> Unit = { path ->
-            File(path).delete()
+        val deleteItem: (SharedFileInfo) -> Unit = { path ->
+            if (path.uri.scheme == "file") {
+                File(path.uri.path).delete()
+            } else {
+                removeUri(path)
+            }
             cacheInvalid()
             fei?.channel?.trySend(SseEvent(data = "refresh"))
+        }
+        val saveToLocal: (SharedFileInfo) -> Unit = {
+            assert(it.uri.scheme != "file")
+            lifecycleScope.launch {
+                saveFile(File(it.name).extension, it.uri)
+                removeUri(it)
+            }
         }
         setContent {
             FeiTheme {
@@ -170,7 +183,7 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                             .padding(paddingValues), color = MaterialTheme.colorScheme.background
                     ) {
-                        Main(shares, deleteItem)
+                        Main(shares, deleteItem, saveToLocal)
                     }
                 }
 
@@ -178,7 +191,18 @@ class MainActivity : ComponentActivity() {
         }
         val intent = Intent(this, FeiService::class.java)
         startService(intent)
-        bindService(intent, connection, 0)
+        if (fei == null)
+            bindService(intent, connection, 0)
+    }
+
+    private fun removeUri(path: SharedFileInfo) {
+        val file = File(filesDir, "list.txt")
+        val readText = file.readText()
+        readText.trim().split("\n").filter {
+            it.isNotEmpty() && it != path.uri.toString()
+        }.joinToString("\n").let {
+            file.writeText(it)
+        }
     }
 
     var fei: FeiService.Fei? = null
@@ -192,6 +216,7 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
+            fei = null
             Toast.makeText(this@MainActivity, "服务已关闭", Toast.LENGTH_SHORT).show()
         }
     }
@@ -207,12 +232,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Main(flow: MutableStateFlow<List<SharedFileInfo>>, deleteItem: (String) -> Unit = {}) {
+fun Main(flow: MutableStateFlow<List<SharedFileInfo>>, deleteItem: (SharedFileInfo) -> Unit = {}, saveToLocal: (SharedFileInfo) -> Unit = {}) {
     val collectAsState by flow.collectAsState()
 
     LazyColumn(content = {
         items(collectAsState.size) {
-            SharedFile(collectAsState[it], deleteItem)
+            SharedFile(collectAsState[it], deleteItem, saveToLocal)
         }
     })
 }
@@ -225,16 +250,37 @@ class ShareFilePreviewProvider : PreviewParameterProvider<SharedFileInfo> {
 
 @Preview
 @Composable
-private fun SharedFile(@PreviewParameter(ShareFilePreviewProvider::class) info: SharedFileInfo, deleteItem: (String) -> Unit = {}) {
+private fun SharedFile(
+    @PreviewParameter(ShareFilePreviewProvider::class) info: SharedFileInfo,
+    deleteItem: (SharedFileInfo) -> Unit = {},
+    saveToLocal: (SharedFileInfo) -> Unit = {},
+) {
+    var expanded by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier
         .clickable {
-            //todo delete
-//            deleteItem(info)
+            expanded = true
         }
         .fillMaxWidth()
         .padding(10.dp)) {
         Text(text = info.uri.toString())
         Text(text = info.name)
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(text = {
+                Text(text = "delete")
+            }, onClick = {
+                deleteItem(info)
+            })
+            if (info.uri.scheme != "file")
+                DropdownMenuItem(text = { Text(text = "save to local") }, onClick = {
+                    saveToLocal(info)
+                    expanded = false
+                })
+        }
     }
 
 }
