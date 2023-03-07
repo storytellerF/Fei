@@ -1,28 +1,47 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport"
-        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/css/iziToast.css" integrity="sha512-DIW4FkYTOxjCqRt7oS9BFO+nVOwDL4bzukDyDtMO7crjUZhwpyrWBFroq+IqRe6VnJkTpRAS6nhDvf0w+wHmxg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/css/iziToast.css"
+          integrity="sha512-DIW4FkYTOxjCqRt7oS9BFO+nVOwDL4bzukDyDtMO7crjUZhwpyrWBFroq+IqRe6VnJkTpRAS6nhDvf0w+wHmxg=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"/>
     <title>Fei</title>
 </head>
 
 <body>
-    <div>
-        <ul>
-            <li th:each="share : ${shares}">
-                <a th:href="@{'shares/' + ${share}}" th:text="${share}"></a>
-            </li>
-        </ul>
+<div>
+    <ul id="shares">
+        <li id="template">
+            <a></a>
+        </li>
+    </ul>
 
-    </div>
-    <ul id="events"></ul>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/js/iziToast.min.js" integrity="sha512-Zq9o+E00xhhR/7vJ49mxFNJ0KQw1E1TMWkPTxrWcnpfEFDEXgUiwJHIKit93EW/XxE31HSI5GEOW06G6BF1AtA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script>
+</div>
+<ul id="events"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/js/iziToast.min.js"
+        integrity="sha512-Zq9o+E00xhhR/7vJ49mxFNJ0KQw1E1TMWkPTxrWcnpfEFDEXgUiwJHIKit93EW/XxE31HSI5GEOW06G6BF1AtA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
         var source = new EventSource('/sse');
+        const templateElement = document.getElementById("template")
+        const shares = document.getElementById("shares")
+        refresh()
+        function refresh() {
+            shares.innerText = ""
+            fetch("/shares").then((response) => response.json()).then((data) => {
+                for(let [i, d] of data.entries()) {
+                    const n = templateElement.cloneNode(true)
+                    n.children[0].innerText = d.name
+                    n.children[0].href = "shares/" + i
+                    shares.appendChild(n)
+                }
+            })
+        }
         var eventsUl = document.getElementById('events');
         function logEvent(text) {
             var li = document.createElement('li')
@@ -32,22 +51,26 @@
         source.addEventListener('message', function (e) {
             if (e.event === 'ping') return
             if (e.data === 'refresh') {
-                location.reload();
+                refresh()
             }
         }, false);
         source.addEventListener('open', function (e) {
             iziToast.show({
                 title: e.type,
                 message: new Date().toString(),
-                color: "blue",
+                color: "green",
                 position: "topRight",
             });
         }, false);
         source.addEventListener('error', function (e) {
             if (e.readyState == EventSource.CLOSED) {
-                logEvent('closed');
+                iziToast.show({
+                    title: e.type,
+                    message: new Date().toString(),
+                    color: "yellow",
+                    position: "topRight",
+                });
             } else {
-                logEvent('error');
                 console.log(e);
                 iziToast.show({
                     title: e.type,
@@ -57,7 +80,9 @@
                 });
             }
         }, false);
-    </script>
+
+
+</script>
 </body>
 
 </html>

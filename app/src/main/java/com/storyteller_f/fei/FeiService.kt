@@ -28,6 +28,9 @@ import kotlinx.coroutines.channels.BroadcastChannel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.broadcast
 import kotlinx.coroutines.channels.produce
+import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
 
 class FeiService : Service() {
@@ -54,7 +57,7 @@ class FeiService : Service() {
         if (managerCompat.getNotificationChannel(channelId) == null)
             managerCompat.createNotificationChannel(channel)
         val notification =
-            NotificationCompat.Builder(this, channelId).setSmallIcon(R.mipmap.ic_launcher).setContentTitle("kuang").setContentText("waiting").build()
+            NotificationCompat.Builder(this, channelId).setSmallIcon(R.mipmap.ic_launcher).setContentTitle("fei").setContentText("waiting").build()
         startForeground(foreground_notification_id, notification)
     }
 
@@ -143,7 +146,9 @@ class FeiService : Service() {
 }
 
 data class SseEvent(val data: String, val event: String? = null, val id: String? = null)
-data class SharedFileInfo(val uri: Uri, val name: String)
+
+@kotlinx.serialization.Serializable
+data class SharedFileInfo(val uri: String, val name: String)
 
 private fun Application.configureRouting(feiService: FeiService) {
     routing {
@@ -151,6 +156,10 @@ private fun Application.configureRouting(feiService: FeiService) {
             call.respond(ThymeleafContent("index", mapOf("shares" to List(shares.value.size) { index ->
                 index.toString()
             })))
+        }
+        get("/shares") {
+            val encodeToString = Json.encodeToString(shares.value)
+            call.respond(encodeToString)
         }
 
         get("/shares/{count}") {
@@ -161,7 +170,7 @@ private fun Application.configureRouting(feiService: FeiService) {
                 ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, info.name)
                     .toString()
             )
-            val file = info.uri
+            val file = Uri.parse(info.uri)
             if (file.scheme == "file") {
                 call.respondFile(file.toFile())
             } else call.respondUri(feiService, file)

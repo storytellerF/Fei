@@ -60,7 +60,7 @@ fun Context.cacheInvalid() {
                     string
                 } else "unknown"
             } ?: "unknown"
-            SharedFileInfo(toUri, name)
+            SharedFileInfo(it, name)
         } catch (e: Exception) {
             null
         }
@@ -70,7 +70,7 @@ fun Context.cacheInvalid() {
     })
     val let = cacheDir.listFiles()?.let {
         it.map { file ->
-            SharedFileInfo(file.toUri(), file.name)
+            SharedFileInfo(file.toUri().toString(), file.name)
         }
     }.orEmpty()
     shares.tryEmit(let + list)
@@ -130,8 +130,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val deleteItem: (SharedFileInfo) -> Unit = { path ->
-            if (path.uri.scheme == "file") {
-                File(path.uri.path).delete()
+            val uri = Uri.parse(path.uri)
+            if (uri.scheme == "file") {
+                File(uri.path).delete()
             } else {
                 removeUri(path)
             }
@@ -139,9 +140,10 @@ class MainActivity : ComponentActivity() {
             fei?.channel?.trySend(SseEvent(data = "refresh"))
         }
         val saveToLocal: (SharedFileInfo) -> Unit = {
-            assert(it.uri.scheme != "file")
+            val uri = Uri.parse(it.uri)
+            assert(uri.scheme != "file")
             lifecycleScope.launch {
-                saveFile(File(it.name).extension, it.uri)
+                saveFile(File(it.name).extension, uri)
                 removeUri(it)
             }
         }
@@ -244,7 +246,7 @@ fun Main(flow: MutableStateFlow<List<SharedFileInfo>>, deleteItem: (SharedFileIn
 
 class ShareFilePreviewProvider : PreviewParameterProvider<SharedFileInfo> {
     override val values: Sequence<SharedFileInfo>
-        get() = sequenceOf(SharedFileInfo(Uri.EMPTY, "world"))
+        get() = sequenceOf(SharedFileInfo(Uri.EMPTY.toString(), "world"))
 
 }
 
@@ -275,7 +277,8 @@ private fun SharedFile(
             }, onClick = {
                 deleteItem(info)
             })
-            if (info.uri.scheme != "file")
+            val uri = Uri.parse(info.uri)
+            if (uri.scheme != "file")
                 DropdownMenuItem(text = { Text(text = "save to local") }, onClick = {
                     saveToLocal(info)
                     expanded = false
