@@ -47,7 +47,7 @@ class FeiService : Service() {
         super.onCreate()
         val channelId = "foreground"
         val channel = NotificationChannelCompat.Builder(channelId, NotificationManagerCompat.IMPORTANCE_MIN).apply {
-            setName("running")
+            setName("running on 8080")
             this.setDescription("前台服务")
         }.build()
         val managerCompat = NotificationManagerCompat.from(this)
