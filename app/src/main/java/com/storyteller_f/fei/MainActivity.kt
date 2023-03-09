@@ -31,8 +31,14 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
@@ -55,7 +61,8 @@ fun Context.cacheInvalid() {
         try {
             val name = contentResolver.query(toUri, null, null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
-                    val columnIndex = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    val columnIndex =
+                        cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
                     val string = cursor.getString(columnIndex)
                     string
                 } else "unknown"
@@ -77,9 +84,10 @@ fun Context.cacheInvalid() {
 }
 
 class MainActivity : ComponentActivity() {
-    private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        addFile(uri)
-    }
+    private val pickFile =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            addFile(uri)
+        }
 
     private fun addFile(uri: Uri?) {
         uri ?: return
@@ -148,6 +156,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         setContent {
+            val navController = rememberNavController()
             FeiTheme {
                 Scaffold(topBar = {
                     TopAppBar(
@@ -162,12 +171,18 @@ class MainActivity : ComponentActivity() {
                             IconButton(onClick = {
                                 fei?.restart()
                             }) {
-                                Icon(Icons.Filled.Refresh, contentDescription = "Localized description")
+                                Icon(
+                                    Icons.Filled.Refresh,
+                                    contentDescription = "Localized description"
+                                )
                             }
                             IconButton(onClick = {
                                 fei?.stop()
                             }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Localized description")
+                                Icon(
+                                    Icons.Filled.Delete,
+                                    contentDescription = "Localized description"
+                                )
                             }
                         },
 
@@ -185,7 +200,20 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                             .padding(paddingValues), color = MaterialTheme.colorScheme.background
                     ) {
-                        Main(shares, deleteItem, saveToLocal)
+                        NavHost(navController = navController, startDestination = "main") {
+                            composable("main") {
+                                Main(shares, deleteItem, saveToLocal) {
+                                    val i = shares.value.indexOf(it)
+                                    navController.navigate("info/$i")
+                                }
+                            }
+                            composable("info/{index}", arguments = listOf(navArgument("index") {
+                                type = NavType.IntType
+                            })) {
+                                val i = it.arguments?.getInt("index")
+                                Info(i ?: 0)
+                            }
+                        }
                     }
                 }
 
@@ -234,19 +262,24 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Main(flow: MutableStateFlow<List<SharedFileInfo>>, deleteItem: (SharedFileInfo) -> Unit = {}, saveToLocal: (SharedFileInfo) -> Unit = {}) {
+fun Main(
+    flow: MutableStateFlow<List<SharedFileInfo>>,
+    deleteItem: (SharedFileInfo) -> Unit = {},
+    saveToLocal: (SharedFileInfo) -> Unit = {},
+    viewInfo: (SharedFileInfo) -> Unit = {},
+) {
     val collectAsState by flow.collectAsState()
 
     LazyColumn(content = {
         items(collectAsState.size) {
-            SharedFile(collectAsState[it], deleteItem, saveToLocal)
+            SharedFile(collectAsState[it], deleteItem, saveToLocal, viewInfo)
         }
     })
 }
 
 class ShareFilePreviewProvider : PreviewParameterProvider<SharedFileInfo> {
     override val values: Sequence<SharedFileInfo>
-        get() = sequenceOf(SharedFileInfo(Uri.EMPTY.toString(), "world"))
+        get() = sequenceOf(SharedFileInfo("http://test.com", "world"))
 
 }
 
@@ -256,6 +289,7 @@ private fun SharedFile(
     @PreviewParameter(ShareFilePreviewProvider::class) info: SharedFileInfo,
     deleteItem: (SharedFileInfo) -> Unit = {},
     saveToLocal: (SharedFileInfo) -> Unit = {},
+    viewInfo: (SharedFileInfo) -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -265,8 +299,8 @@ private fun SharedFile(
         }
         .fillMaxWidth()
         .padding(10.dp)) {
-        Text(text = info.uri.toString())
-        Text(text = info.name)
+        Text(text = info.name, fontSize = 14.sp)
+        Text(text = info.uri, fontSize = 10.sp)
 
         DropdownMenu(
             expanded = expanded,
@@ -283,6 +317,11 @@ private fun SharedFile(
                     saveToLocal(info)
                     expanded = false
                 })
+            DropdownMenuItem(text = {
+                Text(text = "view")
+            }, onClick = {
+                viewInfo(info)
+            })
         }
     }
 
@@ -294,4 +333,16 @@ fun DefaultPreview() {
     FeiTheme {
         Main(MutableStateFlow(ShareFilePreviewProvider().values.toList()))
     }
+}
+
+@Composable
+fun Info(i: Int) {
+    val t by produceState(initialValue = SharedFileInfo("", ""), i, shares) {
+        value = shares.value[i]
+    }
+    Column {
+        Text(text = i.toString())
+        SharedFile(info = t)
+    }
+
 }
