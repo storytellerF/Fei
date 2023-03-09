@@ -92,5 +92,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
 
     implementation 'org.slf4j:slf4j-android:1.7.25'
-//    implementation 'com.github.binarywang:qrcode-utils:1.2'
+    implementation 'com.google.zxing:core:3.5.1'
 }

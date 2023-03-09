@@ -4,6 +4,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
@@ -13,6 +15,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +30,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -39,6 +43,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
@@ -46,6 +53,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Collections
+import java.util.stream.IntStream
+
 
 val shares = MutableStateFlow<List<SharedFileInfo>>(listOf())
 
@@ -340,9 +350,33 @@ fun Info(i: Int) {
     val t by produceState(initialValue = SharedFileInfo("", ""), i, shares) {
         value = shares.value[i]
     }
+    val image by produceState<Bitmap?>(initialValue = null, i) {
+        value = "http://localhost:8080/shares/$i".createQRImage(200, 200)
+    }
     Column {
-        Text(text = i.toString())
         SharedFile(info = t)
+        if (image != null) {
+            Image(bitmap = image!!.asImageBitmap(), contentDescription = "test")
+        }
     }
 
+}
+
+fun String.createQRImage(width: Int, height: Int): Bitmap {
+    val bitMatrix = QRCodeWriter().encode(
+        this,
+        BarcodeFormat.QR_CODE,
+        width,
+        height,
+        Collections.singletonMap(EncodeHintType.CHARACTER_SET, "utf-8")
+    )
+    return Bitmap.createBitmap(
+        IntStream.range(0, height).flatMap { h: Int ->
+            IntStream.range(0, width).map { w: Int ->
+                if (bitMatrix[w, h]
+                ) Color.BLACK else Color.WHITE
+            }
+        }.toArray(),
+        width, height, Bitmap.Config.ARGB_8888
+    )
 }
