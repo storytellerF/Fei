@@ -35,9 +35,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,9 +49,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color.Companion.LightGray
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -168,7 +172,7 @@ class MainActivity : ComponentActivity() {
         val intent = Intent(this, FeiService::class.java)
         startService(intent)
         if (fei == null) bindService(intent, connection, 0)
-        CustomTabsClient.bindCustomTabsService(this, CUSTOM_TAB_PACKAGE_NAME, chromeConnection)
+        CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
     }
 
     @Composable
@@ -238,10 +242,10 @@ class MainActivity : ComponentActivity() {
             prefsItem {
                 EditTextPref(
                     key = "port",
-                    title = "port",
+                    title = stringResource(R.string.port),
                     summary = "server listen on $port",
-                    dialogTitle = "setting port",
-                    dialogMessage = "please input a valid port",
+                    dialogTitle = stringResource(R.string.port_setting),
+                    dialogMessage = stringResource(R.string.please_input_a_valid_port),
                     defaultValue = FeiService.defaultPort.toString()
                 )
             }
@@ -293,15 +297,15 @@ class MainActivity : ComponentActivity() {
                 }) {
                     Icon(
                         Icons.Filled.Refresh,
-                        contentDescription = "Restart Service"
+                        contentDescription = stringResource(R.string.restart_service)
                     )
                 }
                 IconButton(onClick = {
                     stopService()
                 }) {
                     Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = "Stop Service"
+                        ImageVector.vectorResource(id = R.drawable.baseline_stop_24),
+                        contentDescription = stringResource(R.string.stop_service)
                     )
                 }
             },
@@ -311,7 +315,7 @@ class MainActivity : ComponentActivity() {
             AlertDialog(
                 onDismissRequest = { showDialog = false },
                 confirmButton = {
-                    Text(text = "OK", modifier = Modifier.clickable {
+                    Text(text = stringResource(id = android.R.string.ok), modifier = Modifier.clickable {
                         showDialog = false
                     })
                 },
@@ -328,10 +332,14 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     private fun NavDrawer(navController: NavHostController, drawerState: DrawerState) {
         val scope = rememberCoroutineScope()
-        val screenHeight = LocalConfiguration.current.screenHeightDp * LocalConfiguration.current.densityDpi
+        val screenHeight =
+            LocalConfiguration.current.screenHeightDp * LocalConfiguration.current.densityDpi
         NavigationDrawerItem(
             label = {
-                Text(text = "首页")
+                Text(text = stringResource(R.string.home))
+            },
+            icon = {
+                Icon(Icons.Filled.Home, contentDescription = stringResource(id = R.string.home))
             },
             selected = false,
             onClick = {
@@ -343,11 +351,15 @@ class MainActivity : ComponentActivity() {
 
         NavigationDrawerItem(
             label = {
-                Text(text = "关于")
+                Text(text = stringResource(R.string.about))
+            },
+            icon = {
+                Icon(Icons.Filled.Info, contentDescription = stringResource(id = R.string.about))
             },
             selected = false,
             onClick = {
-                val builder = CustomTabsIntent.Builder().setInitialActivityHeightPx((screenHeight * 0.7).toInt())
+                val builder = CustomTabsIntent.Builder()
+                    .setInitialActivityHeightPx((screenHeight * 0.7).toInt())
                 val session = newSession
                 if (session != null) builder.setSession(session)
                 val customTabsIntent = builder.build()
@@ -358,7 +370,10 @@ class MainActivity : ComponentActivity() {
             })
         NavigationDrawerItem(
             label = {
-                Text(text = "设置")
+                Text(text = stringResource(R.string.settings))
+            },
+            icon = {
+                Icon(Icons.Filled.Settings, contentDescription = stringResource(id = R.string.settings))
             },
             selected = false,
             onClick = {
@@ -427,7 +442,7 @@ class MainActivity : ComponentActivity() {
     var fei: FeiService.Fei? = null
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            Toast.makeText(this@MainActivity, "服务已连接", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@MainActivity, getString(R.string.service_connected), Toast.LENGTH_SHORT).show()
             val feiLocal = service as FeiService.Fei
             Log.i(TAG, "onServiceConnected: $feiLocal")
             fei = feiLocal
@@ -436,24 +451,32 @@ class MainActivity : ComponentActivity() {
 
         override fun onServiceDisconnected(name: ComponentName?) {
             fei = null
-            Toast.makeText(this@MainActivity, "服务已关闭", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@MainActivity, getString(R.string.service_closed), Toast.LENGTH_SHORT).show()
         }
     }
 
-    private val CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome" // Change when in stable
+    private val customTabPackageName = "com.android.chrome" // Change when in stable
     var newSession: CustomTabsSession? = null
-    private val chromeConnection: CustomTabsServiceConnection = object : CustomTabsServiceConnection() {
-        override fun onCustomTabsServiceConnected(name: ComponentName, client: CustomTabsClient) {
-            val warmup = client.warmup(0)
-            Log.i(TAG, "onCustomTabsServiceConnected: warmup $warmup")
-            newSession = client.newSession(object : CustomTabsCallback() {
+    private val chromeConnection: CustomTabsServiceConnection =
+        object : CustomTabsServiceConnection() {
+            override fun onCustomTabsServiceConnected(
+                name: ComponentName,
+                client: CustomTabsClient
+            ) {
+                val warmup = client.warmup(0)
+                Log.i(TAG, "onCustomTabsServiceConnected: warmup $warmup")
+                newSession = client.newSession(object : CustomTabsCallback() {
 
-            })
-            newSession?.mayLaunchUrl(Uri.parse("https://github.com/storytellerF/Fei"), null, null)
+                })
+                newSession?.mayLaunchUrl(
+                    Uri.parse("https://github.com/storytellerF/Fei"),
+                    null,
+                    null
+                )
+            }
+
+            override fun onServiceDisconnected(name: ComponentName) {}
         }
-
-        override fun onServiceDisconnected(name: ComponentName) {}
-    }
 
     override fun onResume() {
         super.onResume()

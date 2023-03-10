@@ -66,7 +66,7 @@ class FeiService : Service() {
             NotificationChannelCompat.Builder(channelId, NotificationManagerCompat.IMPORTANCE_MIN)
                 .apply {
                     setName("running")
-                    this.setDescription("前台服务")
+                    this.setDescription(getString(R.string.foreground_service_channel_description))
                 }.build()
         val managerCompat = NotificationManagerCompat.from(this)
         if (managerCompat.getNotificationChannel(channelId) == null)

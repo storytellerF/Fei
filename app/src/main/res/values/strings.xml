@@ -3,4 +3,15 @@
     <string name="view">查看</string>
     <string name="save_to_local">保存到本地</string>
     <string name="delete">删除</string>
+    <string name="about">关于</string>
+    <string name="home">首页</string>
+    <string name="settings">设置</string>
+    <string name="service_connected">服务已连接</string>
+    <string name="service_closed">服务已关闭</string>
+    <string name="restart_service">重启服务</string>
+    <string name="stop_service">停止服务</string>
+    <string name="port">端口</string>
+    <string name="port_setting">端口设置</string>
+    <string name="please_input_a_valid_port">请输入合法的端口</string>
+    <string name="foreground_service_channel_description">前台服务</string>
 </resources>

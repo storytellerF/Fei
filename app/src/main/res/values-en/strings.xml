@@ -4,4 +4,15 @@
     <string name="view">View</string>
     <string name="save_to_local">Save to local</string>
     <string name="delete">Delete</string>
+    <string name="about">About</string>
+    <string name="home">Home</string>
+    <string name="settings">Settings</string>
+    <string name="service_connected">service connected</string>
+    <string name="service_closed">service closed</string>
+    <string name="restart_service">Restart Service</string>
+    <string name="stop_service">Stop Service</string>
+    <string name="port">port</string>
+    <string name="port_setting">port setting</string>
+    <string name="please_input_a_valid_port">please input a valid port</string>
+    <string name="foreground_service_channel_description">foreground service</string>
 </resources>
