@@ -93,4 +93,7 @@ dependencies {
 
     implementation 'org.slf4j:slf4j-android:1.7.25'
     implementation 'com.google.zxing:core:3.5.1'
+
+    implementation "com.github.JamalMulla:ComposePrefs3:1.0.3" // Current is 1.0.3
+    implementation "androidx.datastore:datastore-preferences:1.0.0"
 }

@@ -19,10 +19,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -30,10 +34,13 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color.Companion.LightGray
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,7 +49,12 @@ import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -51,10 +63,14 @@ import androidx.navigation.navArgument
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
+import com.jamal.composeprefs3.ui.PrefsScreen
+import com.jamal.composeprefs3.ui.prefs.EditTextPref
 import com.storyteller_f.fei.ui.theme.FeiTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -100,6 +116,8 @@ fun Context.cacheInvalid() {
     }.orEmpty()
     shares.tryEmit(let + list)
 }
+
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 class MainActivity : ComponentActivity() {
     private val pickFile =
@@ -152,7 +170,9 @@ class MainActivity : ComponentActivity() {
         fei?.channel?.send(SseEvent("refresh"))
     }
 
-    @OptIn(ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class)
+    @OptIn(
+        ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class
+    )
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val deleteItem: (SharedFileInfo) -> Unit = { path ->
@@ -173,63 +193,56 @@ class MainActivity : ComponentActivity() {
                 removeUri(it)
             }
         }
+        val portFlow = dataStore.data.map {
+            it[stringPreferencesKey("port")] ?: FeiService.defaultPort.toString()
+        }
         setContent {
+            val port by portFlow.collectAsState(initial = FeiService.defaultPort.toString())
+            val drawerState = rememberDrawerState(DrawerValue.Closed)
             val navController = rememberNavController()
             FeiTheme {
-                Scaffold(topBar = {
-                    TopAppBar(
-                        title = { Text(stringResource(R.string.app_name)) },
-                        navigationIcon = {
-                            IconButton(onClick = { /* doSomething() */ }) {
-                                Icon(Icons.Filled.Menu, contentDescription = null)
-                            }
-                        },
-                        actions = {
-                            // RowScope here, so these icons will be placed horizontally
-                            IconButton(onClick = {
-                                fei?.restart()
-                            }) {
-                                Icon(
-                                    Icons.Filled.Refresh,
-                                    contentDescription = "Localized description"
-                                )
-                            }
-                            IconButton(onClick = {
-                                fei?.stop()
-                            }) {
-                                Icon(
-                                    Icons.Filled.Delete,
-                                    contentDescription = "Localized description"
-                                )
-                            }
-                        },
-
-                        )
-                }, floatingActionButton = {
-                    FloatingActionButton(onClick = {
-                        pickFile.launch(arrayOf("*/*"))
-                    }) {
-                        Icon(Icons.Filled.Add, contentDescription = "add file")
+                ModalNavigationDrawer(drawerContent = {
+                    ModalDrawerSheet {
+                        Spacer(Modifier.height(12.dp))
+                        NavDrawer(navController, drawerState)
                     }
-                }) { paddingValues ->
-                    // A surface container using the 'background' color from the theme
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues), color = MaterialTheme.colorScheme.background
-                    ) {
-                        NavHost(navController = navController, startDestination = "main") {
-                            composable("main") {
-                                Main(shares, deleteItem, saveToLocal) {
-                                    val i = shares.value.indexOf(it)
-                                    navController.navigate("info/$i")
+                }, drawerState = drawerState) {
+                    Scaffold(topBar = {
+                        FeiMainToolbar(
+                            port,
+                            drawerState,
+                            { fei?.restart() },
+                            { fei?.stop() })
+                    }, floatingActionButton = {
+                        FloatingActionButton(onClick = {
+                            pickFile.launch(arrayOf("*/*"))
+                        }) {
+                            Icon(Icons.Filled.Add, contentDescription = "add file")
+                        }
+                    }) { paddingValues ->
+                        // A surface container using the 'background' color from the theme
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(paddingValues),
+                            color = MaterialTheme.colorScheme.background
+                        ) {
+                            NavHost(navController = navController, startDestination = "main") {
+                                composable("main") {
+                                    Main(shares, deleteItem, saveToLocal) {
+                                        val i = shares.value.indexOf(it)
+                                        navController.navigate("info/$i")
+                                    }
                                 }
-                            }
-                            composable("info/{index}", arguments = listOf(navArgument("index") {
-                                type = NavType.IntType
-                            })) {
-                                val i = it.arguments?.getInt("index")
-                                Info(i ?: 0)
+                                composable("info/{index}", arguments = listOf(navArgument("index") {
+                                    type = NavType.IntType
+                                })) {
+                                    val i = it.arguments?.getInt("index")
+                                    Info(i ?: 0)
+                                }
+                                composable("settings") {
+                                    SettingPage(port)
+                                }
                             }
                         }
                     }
@@ -239,8 +252,121 @@ class MainActivity : ComponentActivity() {
         }
         val intent = Intent(this, FeiService::class.java)
         startService(intent)
-        if (fei == null)
-            bindService(intent, connection, 0)
+        if (fei == null) bindService(intent, connection, 0)
+    }
+
+    @Composable
+    @OptIn(ExperimentalComposeUiApi::class)
+    private fun SettingPage(port: String) {
+        PrefsScreen(dataStore = LocalContext.current.dataStore) {
+            prefsItem {
+                EditTextPref(
+                    key = "port",
+                    title = "port",
+                    summary = "server listen on $port",
+                    dialogTitle = "setting port",
+                    dialogMessage = "please input a valid port",
+                    defaultValue = FeiService.defaultPort.toString()
+                )
+            }
+        }
+    }
+
+    @Composable
+    @OptIn(ExperimentalMaterial3Api::class)
+    private fun FeiMainToolbar(
+        port: String,
+        drawerState: DrawerState,
+        restartService: () -> Unit,
+        stopService: () -> Unit,
+    ) {
+        val scope = rememberCoroutineScope()
+        TopAppBar(
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.app_name))
+                    Text(
+                        text = port,
+                        fontSize = 10.sp,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .background(
+                                LightGray, RoundedCornerShape(8.dp)
+                            )
+                            .padding(8.dp, 4.dp)
+                    )
+                }
+            },
+            navigationIcon = {
+                IconButton(onClick = {
+                    scope.launch {
+                        drawerState.open()
+                    }
+                }) {
+                    Icon(Icons.Filled.Menu, contentDescription = null)
+                }
+            },
+            actions = {
+                IconButton(onClick = {
+                    restartService()
+                }) {
+                    Icon(
+                        Icons.Filled.Refresh,
+                        contentDescription = "Restart Service"
+                    )
+                }
+                IconButton(onClick = {
+                    stopService()
+                }) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = "Stop Service"
+                    )
+                }
+            },
+
+            )
+    }
+
+    @Composable
+    @OptIn(ExperimentalMaterial3Api::class)
+    private fun NavDrawer(navController: NavHostController, drawerState: DrawerState) {
+        val scope = rememberCoroutineScope()
+
+        NavigationDrawerItem(
+            label = {
+                Text(text = "首页")
+            },
+            selected = false,
+            onClick = {
+                navController.navigate("main")
+                scope.launch {
+                    drawerState.close()
+                }
+            })
+
+        NavigationDrawerItem(
+            label = {
+                Text(text = "关于")
+            },
+            selected = false,
+            onClick = {
+                //                                navController.navigate("main")
+                scope.launch {
+                    drawerState.close()
+                }
+            })
+        NavigationDrawerItem(
+            label = {
+                Text(text = "设置")
+            },
+            selected = false,
+            onClick = {
+                navController.navigate("settings")
+                scope.launch {
+                    drawerState.close()
+                }
+            })
     }
 
     private fun removeUri(path: SharedFileInfo) {
@@ -276,6 +402,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        const val defaultPort = 8080
     }
 }
 
@@ -331,10 +458,12 @@ private fun SharedFile(
             })
             val uri = Uri.parse(info.uri)
             if (uri.scheme != "file")
-                DropdownMenuItem(text = { Text(text = stringResource(R.string.save_to_local)) }, onClick = {
-                    saveToLocal(info)
-                    expanded = false
-                })
+                DropdownMenuItem(
+                    text = { Text(text = stringResource(R.string.save_to_local)) },
+                    onClick = {
+                        saveToLocal(info)
+                        expanded = false
+                    })
             DropdownMenuItem(text = {
                 Text(text = stringResource(R.string.view))
             }, onClick = {

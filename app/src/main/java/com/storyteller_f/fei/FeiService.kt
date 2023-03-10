@@ -11,6 +11,7 @@ import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toFile
+import androidx.datastore.preferences.core.stringPreferencesKey
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -22,43 +23,79 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.thymeleaf.*
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.ObsoleteCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.BroadcastChannel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.broadcast
 import kotlinx.coroutines.channels.produce
-import kotlinx.serialization.SerializationStrategy
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
 
 class FeiService : Service() {
     private val binder = Fei(this)
+    private val job = Job()
+    private val scope = CoroutineScope(job)
     override fun onBind(intent: Intent): IBinder {
         Log.d(TAG, "onBind() called with: intent = $intent")
         return binder
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand() called with: intent = $intent, flags = $flags, startId = $startId")
+        Log.d(
+            TAG,
+            "onStartCommand() called with: intent = $intent, flags = $flags, startId = $startId"
+        )
         return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onCreate() {
         Log.d(TAG, "onCreate() called")
         super.onCreate()
-        val channelId = "foreground"
-        val channel = NotificationChannelCompat.Builder(channelId, NotificationManagerCompat.IMPORTANCE_MIN).apply {
-            setName("running on 8080")
-            this.setDescription("前台服务")
-        }.build()
+        val channelId = foregroundChannelId
+        val channel =
+            NotificationChannelCompat.Builder(channelId, NotificationManagerCompat.IMPORTANCE_MIN)
+                .apply {
+                    setName("running")
+                    this.setDescription("前台服务")
+                }.build()
         val managerCompat = NotificationManagerCompat.from(this)
         if (managerCompat.getNotificationChannel(channelId) == null)
             managerCompat.createNotificationChannel(channel)
-        val notification =
-            NotificationCompat.Builder(this, channelId).setSmallIcon(R.mipmap.ic_launcher).setContentTitle("fei").setContentText("waiting").build()
-        startForeground(foreground_notification_id, notification)
+        scope.launch {
+            dataStore.data.map {
+                it[stringPreferencesKey("port")]
+            }.distinctUntilChanged().collectLatest {
+                binder.port = it?.toInt() ?: defaultPort
+                binder.stop()
+                binder.start()
+            }
+        }
+
+    }
+
+    private fun postNotify(managerCompat: NotificationManagerCompat, message: String) {
+        if (managerCompat.areNotificationsEnabled()) {
+            val notification =
+                NotificationCompat.Builder(this, foregroundChannelId)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle(getString(R.string.app_name)).setContentText(message).build()
+            startForeground(foreground_notification_id, notification)
+        } else {
+            Toast.makeText(this, "未开启通知", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun postNotify(message: String) {
+        postNotify(NotificationManagerCompat.from(this), message)
     }
 
     override fun onDestroy() {
@@ -66,19 +103,20 @@ class FeiService : Service() {
         super.onDestroy()
         stopForeground(STOP_FOREGROUND_REMOVE)
         binder.stop()
+        scope.cancel()
     }
 
     @OptIn(ObsoleteCoroutinesApi::class)
     class Fei(private val feiService: FeiService) : Binder() {
         private var server: ApplicationEngine? = null
         var channel: BroadcastChannel<SseEvent>? = null
+        var port = defaultPort
 
         @OptIn(ExperimentalCoroutinesApi::class)
         fun start() {
             Log.d(TAG, "start() called")
             try {
-
-                this.server = embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+                this.server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
                     plugPlugins()
                     channel = produce {
                         var n = 0
@@ -101,6 +139,7 @@ class FeiService : Service() {
                     }
                     configureRouting(feiService)
                 }.start(wait = false)
+                feiService.postNotify("running on $port")
             } catch (th: Throwable) {
                 Log.e(TAG, "start: ${th.localizedMessage}", th)
             }
@@ -110,7 +149,10 @@ class FeiService : Service() {
         private fun Application.plugPlugins() {
             install(StatusPages) {
                 exception<Throwable> { call: ApplicationCall, cause ->
-                    call.respondText(cause.localizedMessage ?: cause.javaClass.canonicalName, status = HttpStatusCode.InternalServerError)
+                    call.respondText(
+                        cause.localizedMessage ?: cause.javaClass.canonicalName,
+                        status = HttpStatusCode.InternalServerError
+                    )
                     Log.e(TAG, "plugPlugins: ", cause)
                 }
             }
@@ -127,6 +169,7 @@ class FeiService : Service() {
         }
 
         fun stop() {
+            feiService.postNotify("stopped")
             server?.stop()
             channel?.cancel()
             channel = null
@@ -140,8 +183,10 @@ class FeiService : Service() {
     }
 
     companion object {
-        private const val TAG = "KuangService"
+        private const val TAG = "FeiService"
         private const val foreground_notification_id = 10
+        private const val foregroundChannelId = "foreground"
+        const val defaultPort = 8080
     }
 }
 
@@ -153,9 +198,14 @@ data class SharedFileInfo(val uri: String, val name: String)
 private fun Application.configureRouting(feiService: FeiService) {
     routing {
         get("/") {
-            call.respond(ThymeleafContent("index", mapOf("shares" to List(shares.value.size) { index ->
-                index.toString()
-            })))
+            call.respond(
+                ThymeleafContent(
+                    "index",
+                    mapOf("shares" to List(shares.value.size) { index ->
+                        index.toString()
+                    })
+                )
+            )
         }
         get("/shares") {
             val encodeToString = Json.encodeToString(shares.value)
@@ -167,7 +217,10 @@ private fun Application.configureRouting(feiService: FeiService) {
             val info = shares.value[s]
             call.response.header(
                 HttpHeaders.ContentDisposition,
-                ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, info.name)
+                ContentDisposition.Attachment.withParameter(
+                    ContentDisposition.Parameters.FileName,
+                    info.name
+                )
                     .toString()
             )
             val file = Uri.parse(info.uri)
