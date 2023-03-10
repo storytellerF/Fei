@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Fei</string>
+    <string name="view">View</string>
+    <string name="save_to_local">Save to local</string>
+    <string name="delete">Delete</string>
+</resources>

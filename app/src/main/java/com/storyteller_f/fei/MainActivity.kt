@@ -16,6 +16,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,7 +31,11 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color.Companion.LightGray
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -56,11 +61,14 @@ import java.io.File
 import java.util.Collections
 import java.util.stream.IntStream
 
-
 val shares = MutableStateFlow<List<SharedFileInfo>>(listOf())
 
+private fun Context.savedUriFile(): File {
+    return File(filesDir, "list.txt")
+}
+
 fun Context.cacheInvalid() {
-    val listFile = File(filesDir, "list.txt")
+    val listFile = savedUriFile()
     if (!listFile.exists()) listFile.createNewFile()
     val readText = listFile.readText()
 
@@ -83,7 +91,7 @@ fun Context.cacheInvalid() {
         }
     }
     listFile.writeText(list.joinToString("\n") {
-        it.uri.toString()
+        it.uri
     })
     val let = cacheDir.listFiles()?.let {
         it.map { file ->
@@ -101,7 +109,6 @@ class MainActivity : ComponentActivity() {
 
     private fun addFile(uri: Uri?) {
         uri ?: return
-        Toast.makeText(this, "waiting", Toast.LENGTH_LONG).show()
         lifecycleScope.launch {
             saveUri(uri)
         }
@@ -110,8 +117,9 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ObsoleteCoroutinesApi::class)
     private suspend fun saveUri(uri: Uri) {
+        val file = savedUriFile()
         withContext(Dispatchers.IO) {
-            File(filesDir, "list.txt").appendText(uri.toString() + "\n")
+            file.appendText(uri.toString() + "\n")
             cacheInvalid()
         }
         fei?.channel?.send(SseEvent("refresh"))
@@ -150,7 +158,7 @@ class MainActivity : ComponentActivity() {
         val deleteItem: (SharedFileInfo) -> Unit = { path ->
             val uri = Uri.parse(path.uri)
             if (uri.scheme == "file") {
-                File(uri.path).delete()
+                uri.path?.let { File(it).delete() }
             } else {
                 removeUri(path)
             }
@@ -170,7 +178,7 @@ class MainActivity : ComponentActivity() {
             FeiTheme {
                 Scaffold(topBar = {
                     TopAppBar(
-                        title = { Text("Simple TopAppBar") },
+                        title = { Text(stringResource(R.string.app_name)) },
                         navigationIcon = {
                             IconButton(onClick = { /* doSomething() */ }) {
                                 Icon(Icons.Filled.Menu, contentDescription = null)
@@ -236,10 +244,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun removeUri(path: SharedFileInfo) {
-        val file = File(filesDir, "list.txt")
+        val file = savedUriFile()
         val readText = file.readText()
         readText.trim().split("\n").filter {
-            it.isNotEmpty() && it != path.uri.toString()
+            it.isNotEmpty() && it != path.uri
         }.joinToString("\n").let {
             file.writeText(it)
         }
@@ -317,18 +325,18 @@ private fun SharedFile(
             onDismissRequest = { expanded = false }
         ) {
             DropdownMenuItem(text = {
-                Text(text = "delete")
+                Text(text = stringResource(R.string.delete))
             }, onClick = {
                 deleteItem(info)
             })
             val uri = Uri.parse(info.uri)
             if (uri.scheme != "file")
-                DropdownMenuItem(text = { Text(text = "save to local") }, onClick = {
+                DropdownMenuItem(text = { Text(text = stringResource(R.string.save_to_local)) }, onClick = {
                     saveToLocal(info)
                     expanded = false
                 })
             DropdownMenuItem(text = {
-                Text(text = "view")
+                Text(text = stringResource(R.string.view))
             }, onClick = {
                 viewInfo(info)
             })
@@ -350,13 +358,44 @@ fun Info(i: Int) {
     val t by produceState(initialValue = SharedFileInfo("", ""), i, shares) {
         value = shares.value[i]
     }
-    val image by produceState<Bitmap?>(initialValue = null, i) {
-        value = "http://localhost:8080/shares/$i".createQRImage(200, 200)
+    val width = LocalView.current.width
+    var selectedIp by remember {
+        mutableStateOf("0.0.0.0")
+    }
+    val image by produceState<Bitmap?>(initialValue = null, i, selectedIp) {
+        value = "http://$selectedIp:8080/shares/$i".createQRImage(width, width)
+    }
+    var expanded by remember { mutableStateOf(false) }
+
+    val all by produceState(initialValue = listOf("0.0.0.0")) {
+        value = allIp()
     }
     Column {
         SharedFile(info = t)
         if (image != null) {
             Image(bitmap = image!!.asImageBitmap(), contentDescription = "test")
+        }
+        Text(
+            text = selectedIp, modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .background(
+                    LightGray, RectangleShape
+                )
+                .padding(8.dp)
+                .clickable {
+                    expanded = true
+                }, fontSize = 16.sp
+        )
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            all.forEach {
+                DropdownMenuItem(text = {
+                    Text(text = it)
+                }, onClick = {
+                    selectedIp = it
+                    expanded = false
+                })
+            }
         }
     }
 
