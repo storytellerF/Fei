@@ -90,7 +90,7 @@ class FeiService : Service() {
                     .setContentTitle(getString(R.string.app_name)).setContentText(message).build()
             startForeground(foreground_notification_id, notification)
         } else {
-            Toast.makeText(this, "未开启通知", Toast.LENGTH_SHORT).show()
+//            Toast.makeText(this, "未开启通知", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -116,7 +116,7 @@ class FeiService : Service() {
         fun start() {
             Log.d(TAG, "start() called")
             try {
-                this.server = embeddedServer(Netty, port = port, host = "0.0.0.0") {
+                this.server = embeddedServer(Netty, port = port, host = listenerAddress) {
                     plugPlugins()
                     channel = produce {
                         var n = 0
@@ -187,6 +187,7 @@ class FeiService : Service() {
         private const val foreground_notification_id = 10
         private const val foregroundChannelId = "foreground"
         const val defaultPort = 8080
+        const val listenerAddress = "0.0.0.0"
     }
 }
 

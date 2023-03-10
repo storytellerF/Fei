@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,20 +35,22 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color.Companion.LightGray
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -66,7 +69,6 @@ import com.google.zxing.qrcode.QRCodeWriter
 import com.jamal.composeprefs3.ui.PrefsScreen
 import com.jamal.composeprefs3.ui.prefs.EditTextPref
 import com.storyteller_f.fei.ui.theme.FeiTheme
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -238,7 +240,7 @@ class MainActivity : ComponentActivity() {
                                     type = NavType.IntType
                                 })) {
                                     val i = it.arguments?.getInt("index")
-                                    Info(i ?: 0)
+                                    Info(i ?: 0, port)
                                 }
                                 composable("settings") {
                                     SettingPage(port)
@@ -273,7 +275,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
     private fun FeiMainToolbar(
         port: String,
         drawerState: DrawerState,
@@ -281,6 +283,8 @@ class MainActivity : ComponentActivity() {
         stopService: () -> Unit,
     ) {
         val scope = rememberCoroutineScope()
+        var showDialog by rememberSaveable { mutableStateOf(false) }
+
         TopAppBar(
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -294,6 +298,9 @@ class MainActivity : ComponentActivity() {
                                 LightGray, RoundedCornerShape(8.dp)
                             )
                             .padding(8.dp, 4.dp)
+                            .clickable {
+                                showDialog = true
+                            }
                     )
                 }
             },
@@ -325,6 +332,21 @@ class MainActivity : ComponentActivity() {
                 }
             },
 
+            )
+        if (showDialog)
+            AlertDialog(
+                onDismissRequest = { showDialog = false },
+                confirmButton = {
+                    Text(text = "OK", modifier = Modifier.clickable {
+                        showDialog = false
+                    })
+                },
+                text = {
+                    ShowQrCode(sub = "", port = port)
+                },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false
+                ),
             )
     }
 
@@ -402,7 +424,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
-        const val defaultPort = 8080
     }
 }
 
@@ -483,30 +504,48 @@ fun DefaultPreview() {
 }
 
 @Composable
-fun Info(i: Int) {
+fun Info(i: Int, port: String) {
     val t by produceState(initialValue = SharedFileInfo("", ""), i, shares) {
         value = shares.value[i]
     }
-    val width = LocalView.current.width
-    var selectedIp by remember {
-        mutableStateOf("0.0.0.0")
+
+    Column {
+        SharedFile(info = t)
+        ShowQrCode("shares/$i", port)
     }
-    val image by produceState<Bitmap?>(initialValue = null, i, selectedIp) {
-        value = "http://$selectedIp:8080/shares/$i".createQRImage(width, width)
+
+}
+
+@Composable
+private fun ShowQrCode(sub: String, port: String) {
+    val width = 200
+    var selectedIp by remember {
+        mutableStateOf(FeiService.listenerAddress)
+    }
+    val image by produceState<Bitmap?>(initialValue = null, sub, selectedIp, port) {
+        value = "http://$selectedIp:$port/$sub".createQRImage(width, width)
     }
     var expanded by remember { mutableStateOf(false) }
 
-    val all by produceState(initialValue = listOf("0.0.0.0")) {
+    val all by produceState(initialValue = listOf(FeiService.listenerAddress)) {
         value = allIp()
     }
-    Column {
-        SharedFile(info = t)
-        if (image != null) {
-            Image(bitmap = image!!.asImageBitmap(), contentDescription = "test")
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        val local = image
+        if (local != null) {
+            val widthDp = LocalConfiguration.current.smallestScreenWidthDp - 200
+            Image(
+                bitmap = local.asImageBitmap(),
+                contentDescription = "test",
+                modifier = Modifier
+                    .width(
+                        widthDp.dp
+                    )
+                    .height(widthDp.dp)
+            )
         }
         Text(
             text = selectedIp, modifier = Modifier
-                .fillMaxWidth()
                 .padding(8.dp)
                 .background(
                     LightGray, RectangleShape
@@ -527,6 +566,7 @@ fun Info(i: Int) {
             }
         }
     }
+
 
 }
 
