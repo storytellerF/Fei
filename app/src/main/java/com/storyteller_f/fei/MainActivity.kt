@@ -15,6 +15,11 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.browser.customtabs.CustomTabsCallback
+import androidx.browser.customtabs.CustomTabsClient
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.browser.customtabs.CustomTabsServiceConnection
+import androidx.browser.customtabs.CustomTabsSession
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -128,51 +133,6 @@ class MainActivity : ComponentActivity() {
             addFile(uri)
         }
 
-    private fun addFile(uri: Uri?) {
-        uri ?: return
-        lifecycleScope.launch {
-            saveUri(uri)
-        }
-
-    }
-
-    @OptIn(ObsoleteCoroutinesApi::class)
-    private suspend fun saveUri(uri: Uri) {
-        val file = savedUriFile()
-        withContext(Dispatchers.IO) {
-            file.appendText(uri.toString() + "\n")
-            cacheInvalid()
-        }
-        fei?.channel?.send(SseEvent("refresh"))
-    }
-
-    @OptIn(ObsoleteCoroutinesApi::class)
-    private suspend fun saveFile(extension: String?, uri: Uri) {
-        try {
-            withContext(Dispatchers.IO) {
-                val file = File(filesDir, "saved/file-${UUID.randomUUID()}.$extension")
-                val byteArray = ByteArray(1024)
-                file.outputStream().use { outs ->
-                    contentResolver.openInputStream(uri)?.use { inp ->
-                        while (true) {
-                            val count = inp.read(byteArray)
-                            if (count != -1) {
-                                outs.write(byteArray, 0, count)
-                            } else break
-                        }
-                    }
-                }
-                file
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "saveFile: ", e)
-            null
-        } ?: return
-
-        cacheInvalid()
-        fei?.channel?.send(SseEvent("refresh"))
-    }
-
     @OptIn(
         ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class
     )
@@ -203,59 +163,72 @@ class MainActivity : ComponentActivity() {
             val port by portFlow.collectAsState(initial = FeiService.defaultPort.toString())
             val drawerState = rememberDrawerState(DrawerValue.Closed)
             val navController = rememberNavController()
-            FeiTheme {
-                ModalNavigationDrawer(drawerContent = {
-                    ModalDrawerSheet {
-                        Spacer(Modifier.height(12.dp))
-                        NavDrawer(navController, drawerState)
-                    }
-                }, drawerState = drawerState) {
-                    Scaffold(topBar = {
-                        FeiMainToolbar(
-                            port,
-                            drawerState,
-                            { fei?.restart() },
-                            { fei?.stop() })
-                    }, floatingActionButton = {
-                        FloatingActionButton(onClick = {
-                            pickFile.launch(arrayOf("*/*"))
-                        }) {
-                            Icon(Icons.Filled.Add, contentDescription = "add file")
-                        }
-                    }) { paddingValues ->
-                        // A surface container using the 'background' color from the theme
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(paddingValues),
-                            color = MaterialTheme.colorScheme.background
-                        ) {
-                            NavHost(navController = navController, startDestination = "main") {
-                                composable("main") {
-                                    Main(shares, deleteItem, saveToLocal) {
-                                        val i = shares.value.indexOf(it)
-                                        navController.navigate("info/$i")
-                                    }
-                                }
-                                composable("info/{index}", arguments = listOf(navArgument("index") {
-                                    type = NavType.IntType
-                                })) {
-                                    val i = it.arguments?.getInt("index")
-                                    Info(i ?: 0, port)
-                                }
-                                composable("settings") {
-                                    SettingPage(port)
-                                }
-                            }
-                        }
-                    }
-                }
-
-            }
+            MainContent(navController, drawerState, port, deleteItem, saveToLocal)
         }
         val intent = Intent(this, FeiService::class.java)
         startService(intent)
         if (fei == null) bindService(intent, connection, 0)
+        CustomTabsClient.bindCustomTabsService(this, CUSTOM_TAB_PACKAGE_NAME, chromeConnection)
+    }
+
+    @Composable
+    @OptIn(ExperimentalMaterial3Api::class)
+    private fun MainContent(
+        navController: NavHostController,
+        drawerState: DrawerState,
+        port: String,
+        deleteItem: (SharedFileInfo) -> Unit,
+        saveToLocal: (SharedFileInfo) -> Unit
+    ) {
+        FeiTheme {
+            ModalNavigationDrawer(drawerContent = {
+                ModalDrawerSheet {
+                    Spacer(Modifier.height(12.dp))
+                    NavDrawer(navController, drawerState)
+                }
+            }, drawerState = drawerState) {
+                Scaffold(topBar = {
+                    FeiMainToolbar(
+                        port,
+                        drawerState,
+                        { fei?.restart() },
+                        { fei?.stop() })
+                }, floatingActionButton = {
+                    FloatingActionButton(onClick = {
+                        pickFile.launch(arrayOf("*/*"))
+                    }) {
+                        Icon(Icons.Filled.Add, contentDescription = "add file")
+                    }
+                }) { paddingValues ->
+                    // A surface container using the 'background' color from the theme
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        NavHost(navController = navController, startDestination = "main") {
+                            composable("main") {
+                                Main(shares, deleteItem, saveToLocal) {
+                                    val i = shares.value.indexOf(it)
+                                    navController.navigate("info/$i")
+                                }
+                            }
+                            composable("info/{index}", arguments = listOf(navArgument("index") {
+                                type = NavType.IntType
+                            })) {
+                                val i = it.arguments?.getInt("index")
+                                Info(i ?: 0, port)
+                            }
+                            composable("settings") {
+                                SettingPage(port)
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
     }
 
     @Composable
@@ -355,7 +328,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     private fun NavDrawer(navController: NavHostController, drawerState: DrawerState) {
         val scope = rememberCoroutineScope()
-
+        val screenHeight = LocalConfiguration.current.screenHeightDp * LocalConfiguration.current.densityDpi
         NavigationDrawerItem(
             label = {
                 Text(text = "首页")
@@ -374,7 +347,11 @@ class MainActivity : ComponentActivity() {
             },
             selected = false,
             onClick = {
-                //                                navController.navigate("main")
+                val builder = CustomTabsIntent.Builder().setInitialActivityHeightPx((screenHeight * 0.7).toInt())
+                val session = newSession
+                if (session != null) builder.setSession(session)
+                val customTabsIntent = builder.build()
+                customTabsIntent.launchUrl(this, Uri.parse("https://github.com/storytellerF/Fei"))
                 scope.launch {
                     drawerState.close()
                 }
@@ -390,6 +367,51 @@ class MainActivity : ComponentActivity() {
                     drawerState.close()
                 }
             })
+    }
+
+    private fun addFile(uri: Uri?) {
+        uri ?: return
+        lifecycleScope.launch {
+            saveUri(uri)
+        }
+
+    }
+
+    @OptIn(ObsoleteCoroutinesApi::class)
+    private suspend fun saveUri(uri: Uri) {
+        val file = savedUriFile()
+        withContext(Dispatchers.IO) {
+            file.appendText(uri.toString() + "\n")
+            cacheInvalid()
+        }
+        fei?.channel?.send(SseEvent("refresh"))
+    }
+
+    @OptIn(ObsoleteCoroutinesApi::class)
+    private suspend fun saveFile(extension: String?, uri: Uri) {
+        try {
+            withContext(Dispatchers.IO) {
+                val file = File(filesDir, "saved/file-${UUID.randomUUID()}.$extension")
+                val byteArray = ByteArray(1024)
+                file.outputStream().use { outs ->
+                    contentResolver.openInputStream(uri)?.use { inp ->
+                        while (true) {
+                            val count = inp.read(byteArray)
+                            if (count != -1) {
+                                outs.write(byteArray, 0, count)
+                            } else break
+                        }
+                    }
+                }
+                file
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "saveFile: ", e)
+            null
+        } ?: return
+
+        cacheInvalid()
+        fei?.channel?.send(SseEvent("refresh"))
     }
 
     private fun removeUri(path: SharedFileInfo) {
@@ -416,6 +438,21 @@ class MainActivity : ComponentActivity() {
             fei = null
             Toast.makeText(this@MainActivity, "服务已关闭", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private val CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome" // Change when in stable
+    var newSession: CustomTabsSession? = null
+    private val chromeConnection: CustomTabsServiceConnection = object : CustomTabsServiceConnection() {
+        override fun onCustomTabsServiceConnected(name: ComponentName, client: CustomTabsClient) {
+            val warmup = client.warmup(0)
+            Log.i(TAG, "onCustomTabsServiceConnected: warmup $warmup")
+            newSession = client.newSession(object : CustomTabsCallback() {
+
+            })
+            newSession?.mayLaunchUrl(Uri.parse("https://github.com/storytellerF/Fei"), null, null)
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {}
     }
 
     override fun onResume() {
