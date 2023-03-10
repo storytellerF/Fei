@@ -77,6 +77,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Collections
+import java.util.UUID
 import java.util.stream.IntStream
 
 val shares = MutableStateFlow<List<SharedFileInfo>>(listOf())
@@ -111,12 +112,12 @@ fun Context.cacheInvalid() {
     listFile.writeText(list.joinToString("\n") {
         it.uri
     })
-    val let = cacheDir.listFiles()?.let {
+    val saved = File(filesDir, "saved").listFiles()?.let {
         it.map { file ->
             SharedFileInfo(file.toUri().toString(), file.name)
         }
     }.orEmpty()
-    shares.tryEmit(let + list)
+    shares.tryEmit(saved + list)
 }
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -149,9 +150,9 @@ class MainActivity : ComponentActivity() {
     private suspend fun saveFile(extension: String?, uri: Uri) {
         try {
             withContext(Dispatchers.IO) {
-                val tempFile = File.createTempFile("file-", ".$extension")
+                val file = File(filesDir, "saved/file-${UUID.randomUUID()}.$extension")
                 val byteArray = ByteArray(1024)
-                tempFile.outputStream().use { outs ->
+                file.outputStream().use { outs ->
                     contentResolver.openInputStream(uri)?.use { inp ->
                         while (true) {
                             val count = inp.read(byteArray)
@@ -161,7 +162,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                tempFile
+                file
             }
         } catch (e: Exception) {
             Log.e(TAG, "saveFile: ", e)

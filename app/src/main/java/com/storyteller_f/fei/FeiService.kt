@@ -32,6 +32,7 @@ import kotlinx.coroutines.channels.BroadcastChannel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.broadcast
 import kotlinx.coroutines.channels.produce
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -75,8 +76,7 @@ class FeiService : Service() {
                 it[stringPreferencesKey("port")]
             }.distinctUntilChanged().collectLatest {
                 binder.port = it?.toInt() ?: defaultPort
-                binder.stop()
-                binder.start()
+                binder.restartAsync()
             }
         }
 
@@ -114,7 +114,15 @@ class FeiService : Service() {
 
         @OptIn(ExperimentalCoroutinesApi::class)
         fun start() {
-            Log.d(TAG, "start() called")
+            feiService.scope.launch {
+                startInternal()
+            }
+
+        }
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        private fun startInternal() {
+            Log.d(TAG, "startInternal() called")
             try {
                 this.server = embeddedServer(Netty, port = port, host = listenerAddress) {
                     plugPlugins()
@@ -122,7 +130,7 @@ class FeiService : Service() {
                         var n = 0
                         while (true) {
                             send(SseEvent("$n", "ping"))
-                            kotlinx.coroutines.delay(1000)
+                            delay(1000)
                             n++
                         }
                     }.broadcast()
@@ -143,7 +151,6 @@ class FeiService : Service() {
             } catch (th: Throwable) {
                 Log.e(TAG, "start: ${th.localizedMessage}", th)
             }
-
         }
 
         private fun Application.plugPlugins() {
@@ -169,6 +176,13 @@ class FeiService : Service() {
         }
 
         fun stop() {
+            feiService.scope.launch {
+                stopInternal()
+            }
+        }
+
+        private fun stopInternal() {
+            Log.d(TAG, "stopInternal() called")
             feiService.postNotify("stopped")
             server?.stop()
             channel?.cancel()
@@ -176,9 +190,16 @@ class FeiService : Service() {
         }
 
         fun restart() {
-            stop()
-            start()
+            feiService.scope.launch {
+                stopInternal()
+                startInternal()
+            }
             Toast.makeText(feiService, "restarted", Toast.LENGTH_SHORT).show()
+        }
+
+        fun restartAsync() {
+            stopInternal()
+            startInternal()
         }
     }
 
