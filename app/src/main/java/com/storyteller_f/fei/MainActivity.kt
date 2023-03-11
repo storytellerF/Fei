@@ -146,12 +146,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val deleteItem: (SharedFileInfo) -> Unit = { path ->
             val uri = Uri.parse(path.uri)
-            if (uri.scheme == "file") {
-                uri.path?.let { File(it).delete() }
-            } else {
-                removeUri(path)
-            }
             lifecycleScope.launch {
+                if (uri.scheme == "file") {
+                    uri.path?.let { File(it).delete() }
+                } else {
+                    removeUri(path)
+                }
                 cacheInvalid()
                 fei?.channel?.trySend(SseEvent(data = "refresh"))
             }
@@ -174,6 +174,12 @@ class MainActivity : ComponentActivity() {
         startService(intent)
         if (fei == null) bindService(intent, connection, 0)
         CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        unbindService(connection)
+        unbindService(chromeConnection)
     }
 
     @Composable
@@ -436,14 +442,17 @@ class MainActivity : ComponentActivity() {
         fei?.channel?.send(SseEvent("refresh"))
     }
 
-    private fun removeUri(path: SharedFileInfo) {
+    private suspend fun removeUri(path: SharedFileInfo) {
         val file = savedUriFile()
-        val readText = file.readText()
-        readText.trim().split("\n").filter {
-            it.isNotEmpty() && it != path.uri
-        }.joinToString("\n").let {
-            file.writeText(it)
+        withContext(Dispatchers.IO) {
+            val readText = file.readText()
+            readText.trim().split("\n").filter {
+                it.isNotEmpty() && it != path.uri
+            }.joinToString("\n").let {
+                file.writeText(it)
+            }
         }
+
     }
 
     var fei: FeiService.Fei? = null
@@ -477,7 +486,7 @@ class MainActivity : ComponentActivity() {
                 name: ComponentName,
                 client: CustomTabsClient
             ) {
-                thread {
+                thread(name = "warmup chrome tab") {
                     val warmup = client.warmup(0)
                     Log.i(TAG, "onCustomTabsServiceConnected: warmup $warmup")
                     newSession = client.newSession(object : CustomTabsCallback() {
