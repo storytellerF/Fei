@@ -1,6 +1,7 @@
 package com.storyteller_f.fei
 
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Binder
@@ -24,6 +25,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.thymeleaf.*
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ObsoleteCoroutinesApi
@@ -40,11 +42,15 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
+val Context.portFlow
+    get() = dataStore.data.map {
+        it[stringPreferencesKey("port")]?.toInt() ?: FeiService.defaultPort
+    }
 
 class FeiService : Service() {
     private val binder = Fei(this)
     private val job = Job()
-    private val scope = CoroutineScope(job)
+    private val scope = CoroutineScope(Dispatchers.IO + job)
     override fun onBind(intent: Intent): IBinder {
         Log.d(TAG, "onBind() called with: intent = $intent")
         return binder
@@ -72,10 +78,9 @@ class FeiService : Service() {
         if (managerCompat.getNotificationChannel(channelId) == null)
             managerCompat.createNotificationChannel(channel)
         scope.launch {
-            dataStore.data.map {
-                it[stringPreferencesKey("port")]
-            }.distinctUntilChanged().collectLatest {
-                binder.port = it?.toInt() ?: defaultPort
+            portFlow.distinctUntilChanged().collectLatest {
+                Log.i(TAG, "onCreate: port $it")
+                binder.port = it
                 binder.restartAsync()
             }
         }
@@ -102,7 +107,7 @@ class FeiService : Service() {
         Log.d(TAG, "onDestroy() called")
         super.onDestroy()
         stopForeground(STOP_FOREGROUND_REMOVE)
-        binder.stop()
+        binder.stopAsync()
         scope.cancel()
     }
 
@@ -113,18 +118,10 @@ class FeiService : Service() {
         var port = defaultPort
 
         @OptIn(ExperimentalCoroutinesApi::class)
-        fun start() {
-            feiService.scope.launch {
-                startInternal()
-            }
-
-        }
-
-        @OptIn(ExperimentalCoroutinesApi::class)
         private fun startInternal() {
             Log.d(TAG, "startInternal() called")
             try {
-                this.server = embeddedServer(Netty, port = port, host = listenerAddress) {
+                server = embeddedServer(Netty, port = port, host = listenerAddress) {
                     plugPlugins()
                     channel = produce {
                         var n = 0
@@ -153,6 +150,37 @@ class FeiService : Service() {
             }
         }
 
+        fun stop() {
+            feiService.scope.launch {
+                stopInternal()
+            }
+        }
+
+        private fun stopInternal() {
+            Log.d(TAG, "stopInternal() called")
+            feiService.postNotify("stopped")
+            server?.stop()
+            server = null
+            channel?.cancel()
+            channel = null
+        }
+
+        fun restart() {
+            feiService.scope.launch {
+                stopInternal()
+                startInternal()
+            }
+            Toast.makeText(feiService, "restarted", Toast.LENGTH_SHORT).show()
+        }
+
+        fun restartAsync() {
+            stopInternal()
+            startInternal()
+        }
+        fun stopAsync() {
+            stopInternal()
+        }
+
         private fun Application.plugPlugins() {
             install(StatusPages) {
                 exception<Throwable> { call: ApplicationCall, cause ->
@@ -173,33 +201,6 @@ class FeiService : Service() {
             }
             install(PartialContent)
             install(AutoHeadResponse)
-        }
-
-        fun stop() {
-            feiService.scope.launch {
-                stopInternal()
-            }
-        }
-
-        private fun stopInternal() {
-            Log.d(TAG, "stopInternal() called")
-            feiService.postNotify("stopped")
-            server?.stop()
-            channel?.cancel()
-            channel = null
-        }
-
-        fun restart() {
-            feiService.scope.launch {
-                stopInternal()
-                startInternal()
-            }
-            Toast.makeText(feiService, "restarted", Toast.LENGTH_SHORT).show()
-        }
-
-        fun restartAsync() {
-            stopInternal()
-            startInternal()
         }
     }
 
@@ -253,6 +254,7 @@ private fun Application.configureRouting(feiService: FeiService) {
     }
 }
 
+@Suppress("BlockingMethodInNonBlockingContext")
 suspend fun ApplicationCall.respondSse(events: ReceiveChannel<SseEvent>) {
     response.cacheControl(CacheControl.NoCache(null))
     respondTextWriter(contentType = ContentType.Text.EventStream) {

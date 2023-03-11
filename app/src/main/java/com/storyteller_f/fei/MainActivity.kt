@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -63,7 +64,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
@@ -81,13 +81,13 @@ import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Collections
 import java.util.UUID
 import java.util.stream.IntStream
+import kotlin.concurrent.thread
 
 val shares = MutableStateFlow<List<SharedFileInfo>>(listOf())
 
@@ -95,9 +95,11 @@ private fun Context.savedUriFile(): File {
     return File(filesDir, "list.txt")
 }
 
-fun Context.cacheInvalid() {
+suspend fun Context.cacheInvalid() {
     val listFile = savedUriFile()
-    if (!listFile.exists()) listFile.createNewFile()
+    if (!listFile.exists()) withContext(Dispatchers.IO) {
+        listFile.createNewFile()
+    }
     val readText = listFile.readText()
 
     val list = readText.split("\n").filter {
@@ -149,8 +151,10 @@ class MainActivity : ComponentActivity() {
             } else {
                 removeUri(path)
             }
-            cacheInvalid()
-            fei?.channel?.trySend(SseEvent(data = "refresh"))
+            lifecycleScope.launch {
+                cacheInvalid()
+                fei?.channel?.trySend(SseEvent(data = "refresh"))
+            }
         }
         val saveToLocal: (SharedFileInfo) -> Unit = {
             val uri = Uri.parse(it.uri)
@@ -160,14 +164,11 @@ class MainActivity : ComponentActivity() {
                 removeUri(it)
             }
         }
-        val portFlow = dataStore.data.map {
-            it[stringPreferencesKey("port")] ?: FeiService.defaultPort.toString()
-        }
         setContent {
-            val port by portFlow.collectAsState(initial = FeiService.defaultPort.toString())
+            val port by LocalContext.current.portFlow.collectAsState(initial = FeiService.defaultPort)
             val drawerState = rememberDrawerState(DrawerValue.Closed)
             val navController = rememberNavController()
-            MainContent(navController, drawerState, port, deleteItem, saveToLocal)
+            MainContent(navController, drawerState, port.toString(), deleteItem, saveToLocal)
         }
         val intent = Intent(this, FeiService::class.java)
         startService(intent)
@@ -315,9 +316,11 @@ class MainActivity : ComponentActivity() {
             AlertDialog(
                 onDismissRequest = { showDialog = false },
                 confirmButton = {
-                    Text(text = stringResource(id = android.R.string.ok), modifier = Modifier.clickable {
-                        showDialog = false
-                    })
+                    Text(
+                        text = stringResource(id = android.R.string.ok),
+                        modifier = Modifier.clickable {
+                            showDialog = false
+                        })
                 },
                 text = {
                     ShowQrCode(sub = "", port = port)
@@ -332,8 +335,9 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     private fun NavDrawer(navController: NavHostController, drawerState: DrawerState) {
         val scope = rememberCoroutineScope()
-        val screenHeight =
-            LocalConfiguration.current.screenHeightDp * LocalConfiguration.current.densityDpi
+        val density = LocalDensity.current
+        val configuration = LocalConfiguration.current
+        val screenHeight = with(density) { configuration.screenHeightDp.dp.roundToPx() }
         NavigationDrawerItem(
             label = {
                 Text(text = stringResource(R.string.home))
@@ -363,7 +367,7 @@ class MainActivity : ComponentActivity() {
                 val session = newSession
                 if (session != null) builder.setSession(session)
                 val customTabsIntent = builder.build()
-                customTabsIntent.launchUrl(this, Uri.parse("https://github.com/storytellerF/Fei"))
+                customTabsIntent.launchUrl(this, Uri.parse(projectUrl))
                 scope.launch {
                     drawerState.close()
                 }
@@ -373,7 +377,10 @@ class MainActivity : ComponentActivity() {
                 Text(text = stringResource(R.string.settings))
             },
             icon = {
-                Icon(Icons.Filled.Settings, contentDescription = stringResource(id = R.string.settings))
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = stringResource(id = R.string.settings)
+                )
             },
             selected = false,
             onClick = {
@@ -442,16 +449,23 @@ class MainActivity : ComponentActivity() {
     var fei: FeiService.Fei? = null
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            Toast.makeText(this@MainActivity, getString(R.string.service_connected), Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this@MainActivity,
+                getString(R.string.service_connected),
+                Toast.LENGTH_SHORT
+            ).show()
             val feiLocal = service as FeiService.Fei
             Log.i(TAG, "onServiceConnected: $feiLocal")
             fei = feiLocal
-            feiLocal.start()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             fei = null
-            Toast.makeText(this@MainActivity, getString(R.string.service_closed), Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this@MainActivity,
+                getString(R.string.service_closed),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -463,16 +477,19 @@ class MainActivity : ComponentActivity() {
                 name: ComponentName,
                 client: CustomTabsClient
             ) {
-                val warmup = client.warmup(0)
-                Log.i(TAG, "onCustomTabsServiceConnected: warmup $warmup")
-                newSession = client.newSession(object : CustomTabsCallback() {
+                thread {
+                    val warmup = client.warmup(0)
+                    Log.i(TAG, "onCustomTabsServiceConnected: warmup $warmup")
+                    newSession = client.newSession(object : CustomTabsCallback() {
 
-                })
-                newSession?.mayLaunchUrl(
-                    Uri.parse("https://github.com/storytellerF/Fei"),
-                    null,
-                    null
-                )
+                    })
+                    newSession?.mayLaunchUrl(
+                        Uri.parse(projectUrl),
+                        null,
+                        null
+                    )
+                }
+
             }
 
             override fun onServiceDisconnected(name: ComponentName) {}
@@ -480,11 +497,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        cacheInvalid()
+        lifecycleScope.launch {
+            cacheInvalid()
+        }
     }
 
     companion object {
         private const val TAG = "MainActivity"
+        const val projectUrl = "https://github.com/storytellerF/Fei"
     }
 }
 
