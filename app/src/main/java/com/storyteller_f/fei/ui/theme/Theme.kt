@@ -102,7 +102,7 @@ fun FeiTheme(
     val controller = rememberSystemUiController()
     if (!view.isInEditMode) {
         SideEffect {
-            controller.setSystemBarsColor(colorScheme.background)
+            controller.setSystemBarsColor(Color.Transparent, darkIcons = !darkTheme)
         }
     }
 
