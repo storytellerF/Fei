@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
@@ -143,6 +144,7 @@ class MainActivity : ComponentActivity() {
         ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class
     )
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         val deleteItem: (SharedFileInfo) -> Unit = { path ->
             val uri = Uri.parse(path.uri)
@@ -274,15 +276,17 @@ class MainActivity : ComponentActivity() {
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.app_name))
+
                     Text(
                         text = port,
                         fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier
                             .padding(8.dp)
                             .background(
-                                LightGray, RoundedCornerShape(8.dp)
+                                MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)
                             )
-                            .padding(8.dp, 4.dp)
+                            .padding(8.dp, 2.dp)
                             .clickable {
                                 showDialog = true
                             }
