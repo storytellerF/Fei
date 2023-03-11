@@ -43,7 +43,7 @@ jobs:
         uses: nowsecure/nowsecure-action@3b439db31b6dce857b09f5222fd13ffc3159ad26
         with:
           token: ${{ secrets.NS_TOKEN }}
-          app_file: app-debug.apk                 # Update this to a path to your .ipa or .apk
+          app_file: build/outputs/apk/debug/app-debug.apk               # Update this to a path to your .ipa or .apk
           group_id: com.storyteller_f                 # Update this to your desired Platform group ID
 
       - name: Upload SARIF file
