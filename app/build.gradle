@@ -74,12 +74,12 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 
     //ktor
-    def ktor_version = "2.2.2"
+    def ktor_version = '2.2.4'
     implementation "io.ktor:ktor-server-core:" + ktor_version
     implementation "io.ktor:ktor-server-netty:$ktor_version"
 
     implementation("io.ktor:ktor-server-webjars:$ktor_version")
-    implementation("org.webjars:jquery:3.6.1")
+    implementation('org.webjars:jquery:3.6.3')
     implementation("io.ktor:ktor-server-host-common:$ktor_version")
     implementation("io.ktor:ktor-server-status-pages:$ktor_version")
     implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
@@ -93,7 +93,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
 
-    implementation 'org.slf4j:slf4j-android:1.7.25'
+    implementation 'org.slf4j:slf4j-android:1.7.36'
     implementation 'com.google.zxing:core:3.5.1'
 
     implementation "com.github.JamalMulla:ComposePrefs3:1.0.3" // Current is 1.0.3
