@@ -15,31 +15,15 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.browser.customtabs.CustomTabsCallback
-import androidx.browser.customtabs.CustomTabsClient
-import androidx.browser.customtabs.CustomTabsIntent
-import androidx.browser.customtabs.CustomTabsServiceConnection
-import androidx.browser.customtabs.CustomTabsSession
+import androidx.browser.customtabs.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -50,11 +34,13 @@ import androidx.compose.ui.graphics.Color.Companion.LightGray
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -86,24 +72,23 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.Collections
-import java.util.UUID
+import java.util.*
 import java.util.stream.IntStream
 import kotlin.concurrent.thread
 
 val shares = MutableStateFlow<List<SharedFileInfo>>(listOf())
 
-private fun Context.savedUriFile(): File {
-    return File(filesDir, "list.txt")
+private suspend fun Context.savedUriFile(): File {
+    return File(filesDir, "list.txt").also { listFile ->
+        if (!listFile.exists()) withContext(Dispatchers.IO) {
+            listFile.createNewFile()
+        }
+    }
 }
 
 suspend fun Context.cacheInvalid() {
     val listFile = savedUriFile()
-    if (!listFile.exists()) withContext(Dispatchers.IO) {
-        listFile.createNewFile()
-    }
     val readText = listFile.readText()
-
     val list = readText.split("\n").filter {
         it.isNotEmpty()
     }.mapNotNull {
@@ -195,6 +180,7 @@ class MainActivity : ComponentActivity() {
         deleteItem: (SharedFileInfo) -> Unit,
         saveToLocal: (SharedFileInfo) -> Unit
     ) {
+        val snackBarHostState = remember { SnackbarHostState() }
         FeiTheme {
             ModalNavigationDrawer(drawerContent = {
                 ModalDrawerSheet {
@@ -213,6 +199,10 @@ class MainActivity : ComponentActivity() {
                         pickFile.launch(arrayOf("*/*"))
                     }) {
                         Icon(Icons.Filled.Add, contentDescription = "add file")
+                    }
+                }, snackbarHost = {
+                    SnackbarHost(hostState = snackBarHostState) {
+
                     }
                 }) { paddingValues ->
                     // A surface container using the 'background' color from the theme
@@ -405,6 +395,7 @@ class MainActivity : ComponentActivity() {
 
     private fun addFile(uri: Uri?) {
         uri ?: return
+        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         lifecycleScope.launch {
             saveUri(uri)
         }
@@ -534,7 +525,7 @@ fun Main(
 
     LazyColumn(content = {
         items(collectAsState.size) {
-            SharedFile(collectAsState[it], deleteItem, saveToLocal, viewInfo)
+            SharedFile(collectAsState[it], true, deleteItem, saveToLocal, viewInfo)
         }
     })
 }
@@ -549,6 +540,7 @@ class ShareFilePreviewProvider : PreviewParameterProvider<SharedFileInfo> {
 @Composable
 private fun SharedFile(
     @PreviewParameter(ShareFilePreviewProvider::class) info: SharedFileInfo,
+    allowView: Boolean = false,
     deleteItem: (SharedFileInfo) -> Unit = {},
     saveToLocal: (SharedFileInfo) -> Unit = {},
     viewInfo: (SharedFileInfo) -> Unit = {},
@@ -581,11 +573,12 @@ private fun SharedFile(
                         saveToLocal(info)
                         expanded = false
                     })
-            DropdownMenuItem(text = {
-                Text(text = stringResource(R.string.view))
-            }, onClick = {
-                viewInfo(info)
-            })
+            if (allowView)
+                DropdownMenuItem(text = {
+                    Text(text = stringResource(R.string.view))
+                }, onClick = {
+                    viewInfo(info)
+                })
         }
     }
 
@@ -607,39 +600,43 @@ fun Info(i: Int, port: String) {
 
     Column {
         SharedFile(info = t)
-        ShowQrCode("shares/$i", port)
+        ShowQrCode("shares/$i", port, Modifier.padding(top = 20.dp))
     }
 
 }
 
 @Composable
-private fun ShowQrCode(sub: String, port: String) {
+private fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier) {
     val width = 200
     var selectedIp by remember {
         mutableStateOf(FeiService.listenerAddress)
     }
-    val image by produceState<Bitmap?>(initialValue = null, sub, selectedIp, port) {
-        value = "http://$selectedIp:$port/$sub".createQRImage(width, width)
+    val url by produceState(initialValue = "http://$selectedIp:$port/$sub", sub, selectedIp, port) {
+        value = "http://$selectedIp:$port/$sub"
+    }
+    val image by remember {
+        derivedStateOf {
+            url.createQRImage(width, width)
+        }
     }
     var expanded by remember { mutableStateOf(false) }
 
     val all by produceState(initialValue = listOf(FeiService.listenerAddress)) {
         value = allIp()
     }
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        val local = image
-        if (local != null) {
-            val widthDp = LocalConfiguration.current.smallestScreenWidthDp - 200
-            Image(
-                bitmap = local.asImageBitmap(),
-                contentDescription = "test",
-                modifier = Modifier
-                    .width(
-                        widthDp.dp
-                    )
-                    .height(widthDp.dp)
-            )
-        }
+    val current = LocalClipboardManager.current
+    val context = LocalContext.current
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.fillMaxWidth()) {
+        val widthDp = LocalConfiguration.current.smallestScreenWidthDp - 100
+        Image(
+            bitmap = image.asImageBitmap(),
+            contentDescription = stringResource(R.string.qrcode),
+            modifier = Modifier
+                .width(
+                    widthDp.dp
+                )
+                .height(widthDp.dp)
+        )
         Text(
             text = selectedIp, modifier = Modifier
                 .padding(8.dp)
@@ -651,6 +648,13 @@ private fun ShowQrCode(sub: String, port: String) {
                     expanded = true
                 }, fontSize = 16.sp
         )
+        val stringResource by rememberUpdatedState(newValue = stringResource(R.string.copied))
+        Button(onClick = {
+            current.setText(AnnotatedString(url))
+            Toast.makeText(context, stringResource, Toast.LENGTH_SHORT).show()
+        }) {
+            Text(text = stringResource(R.string.copy_link))
+        }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             all.forEach {
                 DropdownMenuItem(text = {

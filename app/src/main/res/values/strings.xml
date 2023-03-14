@@ -14,4 +14,7 @@
     <string name="port_setting">端口设置</string>
     <string name="please_input_a_valid_port">请输入合法的端口</string>
     <string name="foreground_service_channel_description">前台服务</string>
+    <string name="qrcode">二维码</string>
+    <string name="copied">已复制</string>
+    <string name="copy_link">复制链接🔗</string>
 </resources>

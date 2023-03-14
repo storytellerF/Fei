@@ -52,7 +52,7 @@ class UriFileContent(
 
     init {
         //todo check file exists
-        versions += LastModifiedVersion(lastModified)
+        versions = versions + LastModifiedVersion(lastModified)
     }
 
     // TODO: consider using WriteChannelContent to avoid piping

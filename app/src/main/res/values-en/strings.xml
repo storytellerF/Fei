@@ -15,4 +15,7 @@
     <string name="port_setting">port setting</string>
     <string name="please_input_a_valid_port">please input a valid port</string>
     <string name="foreground_service_channel_description">foreground service</string>
+    <string name="qrcode">qrcode</string>
+    <string name="copied">copied</string>
+    <string name="copy_link">copy link🔗</string>
 </resources>

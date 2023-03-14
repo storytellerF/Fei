@@ -236,20 +236,25 @@ private fun Application.configureRouting(feiService: FeiService) {
         }
 
         get("/shares/{count}") {
-            val s = call.parameters["count"]?.toInt() ?: return@get
-            val info = shares.value[s]
-            call.response.header(
-                HttpHeaders.ContentDisposition,
-                ContentDisposition.Attachment.withParameter(
-                    ContentDisposition.Parameters.FileName,
-                    info.name
+            val index = call.parameters["count"]?.toInt() ?: return@get
+            val info = shares.value.getOrNull(index)
+            if (info == null) {
+                call.respond(HttpStatusCode.NotFound)
+            } else {
+                call.response.header(
+                    HttpHeaders.ContentDisposition,
+                    ContentDisposition.Attachment.withParameter(
+                        ContentDisposition.Parameters.FileName,
+                        info.name
+                    )
+                        .toString()
                 )
-                    .toString()
-            )
-            val file = Uri.parse(info.uri)
-            if (file.scheme == "file") {
-                call.respondFile(file.toFile())
-            } else call.respondUri(feiService, file)
+                val file = Uri.parse(info.uri)
+                if (file.scheme == "file") {
+                    call.respondFile(file.toFile())
+                } else call.respondUri(feiService, file)
+            }
+
         }
     }
 }
