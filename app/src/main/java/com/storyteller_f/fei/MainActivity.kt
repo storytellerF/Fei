@@ -591,8 +591,22 @@ private fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier)
     }
     var expanded by remember { mutableStateOf(false) }
 
-    val all by produceState(initialValue = listOf(FeiService.listenerAddress)) {
+    val ipList by produceState(initialValue = listOf(FeiService.listenerAddress)) {
         value = allIp()
+    }
+    var quickSelectText by remember {
+        mutableStateOf("")
+    }
+    var quickSelectData by remember {
+        mutableStateOf("")
+    }
+    LaunchedEffect(key1 = ipList) {
+        ipList.firstOrNull {
+            it.startsWith("192.168.")
+        }?.let {
+            quickSelectText = "quick to $it"
+            quickSelectData = it
+        }
     }
     val current = LocalClipboardManager.current
     val context = LocalContext.current
@@ -618,6 +632,12 @@ private fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier)
                     expanded = true
                 }, fontSize = 16.sp
         )
+        if (quickSelectText.isNotEmpty())
+            Button(onClick = {
+                selectedIp = quickSelectData
+            }) {
+                Text(text = quickSelectText)
+            }
         val stringResource by rememberUpdatedState(newValue = stringResource(R.string.copied))
         Button(onClick = {
             current.setText(AnnotatedString(url))
@@ -626,7 +646,7 @@ private fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier)
             Text(text = stringResource(R.string.copy_link))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            all.forEach {
+            ipList.forEach {
                 DropdownMenuItem(text = {
                     Text(text = it)
                 }, onClick = {
