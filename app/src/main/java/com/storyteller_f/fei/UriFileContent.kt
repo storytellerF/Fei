@@ -2,6 +2,7 @@ package com.storyteller_f.fei
 
 import android.content.Context
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import io.ktor.http.*
 import io.ktor.http.content.*
@@ -21,34 +22,46 @@ import java.nio.channels.FileChannel
 import kotlin.coroutines.CoroutineContext
 
 suspend fun ApplicationCall.respondUri(context: Context, file: Uri, configure: OutgoingContent.() -> Unit = {}) {
-    val query = context.contentResolver.query(file, null, null, null)
-    query?.use {
-        if (it.moveToFirst()) {
-            val mimeTypeIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
-            val sizeIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-            val lastModifiedIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-            val mimeType = it.getString(mimeTypeIndex)
-            val size = it.getLong(sizeIndex)
-            val lastModified = it.getLong(lastModifiedIndex)
-            val parse = ContentType.parse(mimeType)
-            val fileDescriptor = context.contentResolver.openFileDescriptor(file, "r")!!
-            val message =
-                UriFileContent(contentType = parse, fileDescriptor = fileDescriptor.fileDescriptor, length = size, lastModified = lastModified).apply(
-                    configure
-                )
-            respond(message)
+    val it = context.contentResolver.query(file, null, null, null)
+    if (it == null) {
+        respond(HttpStatusCode.NotFound)
+    } else {
+        it.use {
+            if (!it.moveToFirst()) {
+                respond(HttpStatusCode.NotFound)
+            } else {
+                val mimeTypeIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                val lastModifiedIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                val mimeType = it.getString(mimeTypeIndex)
+                val size = it.getLong(sizeIndex)
+                val lastModified = it.getLong(lastModifiedIndex)
+                val parse = ContentType.parse(mimeType)
+                val fileDescriptor = context.contentResolver.openFileDescriptor(file, "r")
+                if (fileDescriptor == null) {
+                    respond(HttpStatusCode.NotFound)
+                } else {
+                    val content =
+                        UriFileContent(contentType = parse, parcelFileDescriptor = fileDescriptor, length = size, lastModified = lastModified).apply(
+                            configure
+                        )
+                    respond(content)
+                }
+            }
         }
+
     }
 }
 
 class UriFileContent(
     override val contentType: ContentType,
-    private val fileDescriptor: FileDescriptor,
+    private val parcelFileDescriptor: ParcelFileDescriptor,
     private val length: Long,
     lastModified: Long,
 ) : OutgoingContent.ReadChannelContent() {
 
     override val contentLength: Long get() = length
+    private val fileDescriptor: FileDescriptor get() = parcelFileDescriptor.fileDescriptor
 
     init {
         //todo check file exists
