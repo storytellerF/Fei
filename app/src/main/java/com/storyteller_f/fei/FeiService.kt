@@ -24,24 +24,22 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.thymeleaf.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.ObsoleteCoroutinesApi
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BroadcastChannel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.broadcast
 import kotlinx.coroutines.channels.produce
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
+import java.io.File
+import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.util.*
+
 val Context.portFlow
     get() = dataStore.data.map {
         it[stringPreferencesKey("port")]?.toInt() ?: FeiService.defaultPort
@@ -177,6 +175,7 @@ class FeiService : Service() {
             stopInternal()
             startInternal()
         }
+
         fun stopAsync() {
             stopInternal()
         }
@@ -201,6 +200,48 @@ class FeiService : Service() {
             }
             install(PartialContent)
             install(AutoHeadResponse)
+        }
+
+        fun saveToLocal(uri: Uri?, info: SharedFileInfo) {
+            uri ?: return
+            feiService.scope.launch {
+                saveFile(File(info.name).extension, uri)
+                feiService.removeUri(info)
+                feiService.cacheInvalid()
+                channel?.send(SseEvent("refresh"))
+            }
+        }
+
+        private suspend fun saveFile(extension: String?, uri: Uri) {
+            try {
+                withContext(Dispatchers.IO) {
+                    val file = File(feiService.filesDir, "saved/file-${UUID.randomUUID()}.$extension")
+                    val parentFile = file.parentFile!!
+                    if (!parentFile.exists()) {
+                        parentFile.mkdirs()
+                    }
+                    if (file.createNewFile()) {
+                        file.outputStream().channel.use { oChannel ->
+                            feiService.contentResolver.openFileDescriptor(uri, "r")?.use { parcelFileDescriptor ->
+                                FileInputStream(parcelFileDescriptor.fileDescriptor).channel.use { iChannel ->
+                                    val byteBuffer = ByteBuffer.allocateDirect(1024)
+                                    while (iChannel.read(byteBuffer) != -1) {
+                                        byteBuffer.flip()
+                                        oChannel.write(byteBuffer)
+                                        byteBuffer.clear()
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Log.e(TAG, "create file failed ${file.absolutePath}")
+                    }
+
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "saveFile: ", e)
+            }
+
         }
     }
 

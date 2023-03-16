@@ -86,6 +86,19 @@ private suspend fun Context.savedUriFile(): File {
     }
 }
 
+suspend fun Context.removeUri(path: SharedFileInfo) {
+    val file = savedUriFile()
+    withContext(Dispatchers.IO) {
+        val readText = file.readText()
+        readText.trim().split("\n").filter {
+            it.isNotEmpty() && it != path.uri
+        }.joinToString("\n").let {
+            file.writeText(it)
+        }
+    }
+
+}
+
 suspend fun Context.cacheInvalid() {
     val listFile = savedUriFile()
     val readText = listFile.readText()
@@ -148,10 +161,7 @@ class MainActivity : ComponentActivity() {
         val saveToLocal: (SharedFileInfo) -> Unit = {
             val uri = Uri.parse(it.uri)
             assert(uri.scheme != "file")
-            lifecycleScope.launch {
-                saveFile(File(it.name).extension, uri)
-                removeUri(it)
-            }
+            fei?.saveToLocal(uri, it)
         }
         setContent {
             val port by LocalContext.current.portFlow.collectAsState(initial = FeiService.defaultPort)
@@ -410,46 +420,6 @@ class MainActivity : ComponentActivity() {
             cacheInvalid()
         }
         fei?.channel?.send(SseEvent("refresh"))
-    }
-
-    @OptIn(ObsoleteCoroutinesApi::class)
-    private suspend fun saveFile(extension: String?, uri: Uri) {
-        try {
-            withContext(Dispatchers.IO) {
-                val file = File(filesDir, "saved/file-${UUID.randomUUID()}.$extension")
-                val byteArray = ByteArray(1024)
-                file.outputStream().use { outs ->
-                    contentResolver.openInputStream(uri)?.use { inp ->
-                        while (true) {
-                            val count = inp.read(byteArray)
-                            if (count != -1) {
-                                outs.write(byteArray, 0, count)
-                            } else break
-                        }
-                    }
-                }
-                file
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "saveFile: ", e)
-            null
-        } ?: return
-
-        cacheInvalid()
-        fei?.channel?.send(SseEvent("refresh"))
-    }
-
-    private suspend fun removeUri(path: SharedFileInfo) {
-        val file = savedUriFile()
-        withContext(Dispatchers.IO) {
-            val readText = file.readText()
-            readText.trim().split("\n").filter {
-                it.isNotEmpty() && it != path.uri
-            }.joinToString("\n").let {
-                file.writeText(it)
-            }
-        }
-
     }
 
     var fei: FeiService.Fei? = null
