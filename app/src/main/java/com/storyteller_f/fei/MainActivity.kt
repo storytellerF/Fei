@@ -88,14 +88,21 @@ private suspend fun Context.savedUriFile(): File {
 
 suspend fun Context.removeUri(path: SharedFileInfo) {
     val file = savedUriFile()
-    withContext(Dispatchers.IO) {
-        val readText = file.readText()
-        readText.trim().split("\n").filter {
-            it.isNotEmpty() && it != path.uri
-        }.joinToString("\n").let {
-            file.writeText(it)
+    try {
+        withContext(Dispatchers.IO) {
+            val readText = file.readText()
+            readText.trim().split("\n").filter {
+                it.isNotEmpty() && it != path.uri
+            }.joinToString("\n").let {
+                file.writeText(it)
+            }
         }
+        //todo contentResolver.outgoingPersistedUriPermissions
+        contentResolver.releasePersistableUriPermission(path.uri.toUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    } catch (e: Exception) {
+        Toast.makeText(this, e.localizedMessage, Toast.LENGTH_LONG).show()
     }
+
 
 }
 
