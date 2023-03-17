@@ -18,4 +18,5 @@
     <string name="qrcode">qrcode</string>
     <string name="copied">copied</string>
     <string name="copy_link">copy link🔗</string>
+    <string name="quick_selected_ip">quick to %s</string>
 </resources>

@@ -594,9 +594,6 @@ private fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier)
     val ipList by produceState(initialValue = listOf(FeiService.listenerAddress)) {
         value = allIp()
     }
-    var quickSelectText by remember {
-        mutableStateOf("")
-    }
     var quickSelectData by remember {
         mutableStateOf("")
     }
@@ -604,7 +601,6 @@ private fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier)
         ipList.firstOrNull {
             it.startsWith("192.168.")
         }?.let {
-            quickSelectText = "quick to $it"
             quickSelectData = it
         }
     }
@@ -625,18 +621,19 @@ private fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier)
             text = selectedIp, modifier = Modifier
                 .padding(8.dp)
                 .background(
-                    LightGray, RectangleShape
+                    MaterialTheme.colorScheme.onPrimaryContainer, RectangleShape
                 )
                 .padding(8.dp)
                 .clickable {
                     expanded = true
-                }, fontSize = 16.sp
+                }, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary
         )
-        if (quickSelectText.isNotEmpty())
+        if (quickSelectData.isNotEmpty())
             Button(onClick = {
                 selectedIp = quickSelectData
-            }) {
-                Text(text = quickSelectText)
+                quickSelectData = ""
+            }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.secondary)) {
+                Text(text = stringResource(id = R.string.quick_selected_ip, quickSelectData))
             }
         val stringResource by rememberUpdatedState(newValue = stringResource(R.string.copied))
         Button(onClick = {
