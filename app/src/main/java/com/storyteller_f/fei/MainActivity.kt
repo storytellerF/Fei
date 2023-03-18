@@ -30,7 +30,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color.Companion.LightGray
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -70,6 +69,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.*
@@ -106,36 +107,46 @@ suspend fun Context.removeUri(path: SharedFileInfo) {
 
 }
 
-suspend fun Context.cacheInvalid() {
+val mutex = Mutex()
+
+suspend fun Context.cacheInvalid() = withContext(Dispatchers.IO) {
+    mutex.withLock {
+        cacheInvalidInternal()
+    }
+}
+
+private suspend fun Context.cacheInvalidInternal(): Boolean {
     val listFile = savedUriFile()
     val readText = listFile.readText()
-    val list = readText.split("\n").filter {
+    val savedList = readText.split("\n").filter {
         it.isNotEmpty()
     }.mapNotNull {
-        val toUri = it.toUri()
-        try {
-            val name = contentResolver.query(toUri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val columnIndex =
-                        cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                    val string = cursor.getString(columnIndex)
-                    string
-                } else "unknown"
-            } ?: "unknown"
-            SharedFileInfo(it, name)
-        } catch (e: Exception) {
-            null
-        }
+        sharedFileInfo(it)
     }
-    listFile.writeText(list.joinToString("\n") {
+    listFile.writeText(savedList.joinToString("\n") {
         it.uri
     })
-    val saved = File(filesDir, "saved").listFiles()?.let {
+    val savedFiles = File(filesDir, "saved").listFiles()?.let {
         it.map { file ->
             SharedFileInfo(file.toUri().toString(), file.name)
         }
     }.orEmpty()
-    shares.tryEmit(saved + list)
+    return shares.tryEmit(savedFiles + savedList)
+}
+
+private fun Context.sharedFileInfo(it: String) = try {
+    val toUri = it.toUri()
+    val name = contentResolver.query(toUri, null, null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            val columnIndex =
+                cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+            val string = cursor.getString(columnIndex)
+            string
+        } else "unknown"
+    } ?: "unknown"
+    SharedFileInfo(it, name)
+} catch (e: Exception) {
+    null
 }
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -143,7 +154,7 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 class MainActivity : ComponentActivity() {
     private val pickFile =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            addFile(uri)
+            addUri(uri)
         }
 
     @OptIn(
@@ -410,7 +421,7 @@ class MainActivity : ComponentActivity() {
             })
     }
 
-    private fun addFile(uri: Uri?) {
+    private fun addUri(uri: Uri?) {
         uri ?: return
         contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         lifecycleScope.launch {
@@ -423,9 +434,9 @@ class MainActivity : ComponentActivity() {
     private suspend fun saveUri(uri: Uri) {
         val file = savedUriFile()
         withContext(Dispatchers.IO) {
-            file.appendText(uri.toString() + "\n")
-            cacheInvalid()
+            file.appendText("\n$uri")
         }
+        cacheInvalid()
         fei?.channel?.send(SseEvent("refresh"))
     }
 
@@ -477,6 +488,7 @@ class MainActivity : ComponentActivity() {
 
             override fun onServiceDisconnected(name: ComponentName) {}
         }
+
 
     override fun onResume() {
         super.onResume()
@@ -636,10 +648,16 @@ private fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier)
                 }, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary
         )
         if (quickSelectData.isNotEmpty())
-            Button(onClick = {
-                selectedIp = quickSelectData
-                quickSelectData = ""
-            }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.secondary)) {
+            Button(
+                onClick = {
+                    selectedIp = quickSelectData
+                    quickSelectData = ""
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
                 Text(text = stringResource(id = R.string.quick_selected_ip, quickSelectData))
             }
         val stringResource by rememberUpdatedState(newValue = stringResource(R.string.copied))
