@@ -15,7 +15,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.*
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,16 +28,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
@@ -55,6 +50,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.zxing.BarcodeFormat
@@ -62,6 +58,8 @@ import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.jamal.composeprefs3.ui.PrefsScreen
 import com.jamal.composeprefs3.ui.prefs.EditTextPref
+import com.storyteller_f.fei.ui.components.MessagePage
+import com.storyteller_f.fei.ui.components.ShowQrCode
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
@@ -133,6 +131,7 @@ class MainActivity : ComponentActivity() {
         saveToLocal: (SharedFileInfo) -> Unit
     ) {
         val snackBarHostState = remember { SnackbarHostState() }
+        val currentBackStackEntryAsState by navController.currentBackStackEntryAsState()
         FeiTheme {
             ModalNavigationDrawer(drawerContent = {
                 ModalDrawerSheet {
@@ -147,11 +146,13 @@ class MainActivity : ComponentActivity() {
                         { fei?.restart() },
                         { fei?.stop() })
                 }, floatingActionButton = {
-                    FloatingActionButton(onClick = {
-                        pickFile.launch(arrayOf("*/*"))
-                    }) {
-                        Icon(Icons.Filled.Add, contentDescription = "add file")
-                    }
+                    val text = currentBackStackEntryAsState?.destination?.route.orEmpty()
+                    if (text != "messages")
+                        FloatingActionButton(onClick = {
+                            pickFile.launch(arrayOf("*/*"))
+                        }) {
+                            Icon(Icons.Filled.Add, contentDescription = "add file")
+                        }
                 }, snackbarHost = {
                     SnackbarHost(hostState = snackBarHostState) {
 
@@ -180,11 +181,25 @@ class MainActivity : ComponentActivity() {
                             composable("settings") {
                                 SettingPage(port)
                             }
+                            composable("messages") {
+                                Messages()
+                            }
                         }
                     }
                 }
             }
 
+        }
+    }
+
+    @Composable
+    fun Messages() {
+        val fei = fei
+        if (fei != null) {
+            val collectAsState by fei.messagesCache.collectAsState()
+            MessagePage(collectAsState) {
+                fei.sendMessage(it)
+            }
         }
     }
 
@@ -306,6 +321,15 @@ class MainActivity : ComponentActivity() {
                     drawerState.close()
                 }
             })
+
+        NavigationDrawerItem(label = { Text(text = "messages") }, icon = {
+            Icon(Icons.Filled.AccountBox, contentDescription = "messages")
+        }, selected = false, onClick = {
+            navController.navigate("messages")
+            scope.launch {
+                drawerState.close()
+            }
+        })
 
         NavigationDrawerItem(
             label = {
@@ -515,94 +539,6 @@ fun Info(i: Int, port: String) {
         SharedFile(info = t)
         ShowQrCode("shares/$i", port, Modifier.padding(top = 20.dp))
     }
-
-}
-
-@Composable
-private fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier) {
-    val width = 200
-    var selectedIp by remember {
-        mutableStateOf(FeiService.listenerAddress)
-    }
-    val url by produceState(initialValue = "http://$selectedIp:$port/$sub", sub, selectedIp, port) {
-        value = "http://$selectedIp:$port/$sub"
-    }
-    val image by remember {
-        derivedStateOf {
-            url.createQRImage(width, width)
-        }
-    }
-    var expanded by remember { mutableStateOf(false) }
-
-    val ipList by produceState(initialValue = listOf(FeiService.listenerAddress)) {
-        value = allIp()
-    }
-    var quickSelectData by remember {
-        mutableStateOf("")
-    }
-    LaunchedEffect(key1 = ipList) {
-        ipList.firstOrNull {
-            it.startsWith("192.168.")
-        }?.let {
-            quickSelectData = it
-        }
-    }
-    val current = LocalClipboardManager.current
-    val context = LocalContext.current
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.fillMaxWidth()) {
-        val widthDp = LocalConfiguration.current.smallestScreenWidthDp - 100
-        Image(
-            bitmap = image.asImageBitmap(),
-            contentDescription = stringResource(R.string.qrcode),
-            modifier = Modifier
-                .width(
-                    widthDp.dp
-                )
-                .height(widthDp.dp)
-        )
-        Text(
-            text = selectedIp, modifier = Modifier
-                .padding(8.dp)
-                .background(
-                    MaterialTheme.colorScheme.onPrimaryContainer, RectangleShape
-                )
-                .padding(8.dp)
-                .clickable {
-                    expanded = true
-                }, fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimary
-        )
-        if (quickSelectData.isNotEmpty())
-            Button(
-                onClick = {
-                    selectedIp = quickSelectData
-                    quickSelectData = ""
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.secondary
-                )
-            ) {
-                Text(text = stringResource(id = R.string.quick_selected_ip, quickSelectData))
-            }
-        val stringResource by rememberUpdatedState(newValue = stringResource(R.string.copied))
-        Button(onClick = {
-            current.setText(AnnotatedString(url))
-            Toast.makeText(context, stringResource, Toast.LENGTH_SHORT).show()
-        }) {
-            Text(text = stringResource(R.string.copy_link))
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            ipList.forEach {
-                DropdownMenuItem(text = {
-                    Text(text = it)
-                }, onClick = {
-                    selectedIp = it
-                    expanded = false
-                })
-            }
-        }
-    }
-
 
 }
 

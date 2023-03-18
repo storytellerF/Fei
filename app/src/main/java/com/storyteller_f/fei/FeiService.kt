@@ -13,6 +13,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toFile
 import androidx.datastore.preferences.core.stringPreferencesKey
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.websocket.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.*
 import io.ktor.server.application.*
@@ -26,11 +29,15 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.thymeleaf.*
 import io.ktor.server.websocket.*
+import io.ktor.server.websocket.WebSockets
+import io.ktor.websocket.*
+import io.ktor.websocket.serialization.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BroadcastChannel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.broadcast
 import kotlinx.coroutines.channels.produce
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -116,7 +123,10 @@ class FeiService : Service() {
     class Fei(private val feiService: FeiService) : Binder() {
         private var server: ApplicationEngine? = null
         var channel: BroadcastChannel<SseEvent>? = null
+        var selfClient: HttpClient? = null
+        var selfSession: DefaultClientWebSocketSession? = null
         var port = defaultPort
+        val messagesCache = MutableStateFlow(listOf<Message>())
 
         @OptIn(ExperimentalCoroutinesApi::class)
         private fun startInternal() {
@@ -146,9 +156,34 @@ class FeiService : Service() {
                     configureRouting(feiService)
                     webSocketsService()
                 }.start(wait = false)
+                val httpClient = HttpClient(CIO) {
+                    install(io.ktor.client.plugins.websocket.WebSockets) {
+                        pingInterval = 20_000
+                        contentConverter = KotlinxWebsocketSerializationConverter(Json)
+                    }
+                }
+                selfClient = httpClient
+                val coroutineExceptionHandler = CoroutineExceptionHandler { t, t1 ->
+
+                }
+                feiService.scope.launch(coroutineExceptionHandler) {
+                    httpClient.webSocket(method = HttpMethod.Get, host = "127.0.0.1", port = port, path = "/chat") {
+                        selfSession = this
+                        try {
+                            while (true) {
+                                val receiveDeserialized = receiveDeserialized<Message>()
+                                messagesCache.value = messagesCache.value.plus(receiveDeserialized)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "startInternal: self webSocket", e)
+                        }
+                        selfSession = null
+                    }
+                    Log.i(TAG, "startInternal: self webSocket end")
+                }
                 feiService.postNotify("running on $port")
             } catch (th: Throwable) {
-                Log.e(TAG, "start: ${th.localizedMessage}", th)
+                Log.e(TAG, "startInternal: ${th.localizedMessage}", th)
             }
         }
 
@@ -161,6 +196,9 @@ class FeiService : Service() {
         private fun stopInternal() {
             Log.d(TAG, "stopInternal() called")
             feiService.postNotify("stopped")
+            selfClient?.close()
+            selfClient = null
+            selfSession = null
             server?.stop()
             server = null
             channel?.cancel()
@@ -256,6 +294,12 @@ class FeiService : Service() {
                         }
                     }
                 }
+            }
+        }
+
+        fun sendMessage(content: String) {
+            feiService.scope.launch {
+                selfSession?.send(content)
             }
         }
     }
