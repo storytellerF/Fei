@@ -14,6 +14,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toFile
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -24,6 +25,7 @@ import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.thymeleaf.*
+import io.ktor.server.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BroadcastChannel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -38,6 +40,7 @@ import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
 import java.io.File
 import java.io.FileInputStream
 import java.nio.ByteBuffer
+import java.time.Duration
 import java.util.*
 
 val Context.portFlow
@@ -141,6 +144,7 @@ class FeiService : Service() {
                         }
                     }
                     configureRouting(feiService)
+                    webSocketsService()
                 }.start(wait = false)
                 feiService.postNotify("running on $port")
             } catch (th: Throwable) {
@@ -200,6 +204,13 @@ class FeiService : Service() {
             }
             install(PartialContent)
             install(AutoHeadResponse)
+            install(WebSockets) {
+                pingPeriod = Duration.ofSeconds(15)
+                timeout = Duration.ofSeconds(15)
+                maxFrameSize = Long.MAX_VALUE
+                masking = false
+                contentConverter = KotlinxWebsocketSerializationConverter(Json)
+            }
         }
 
         fun saveToLocal(uri: Uri?, info: SharedFileInfo) {
@@ -221,18 +232,7 @@ class FeiService : Service() {
                         parentFile.mkdirs()
                     }
                     if (file.createNewFile()) {
-                        file.outputStream().channel.use { oChannel ->
-                            feiService.contentResolver.openFileDescriptor(uri, "r")?.use { parcelFileDescriptor ->
-                                FileInputStream(parcelFileDescriptor.fileDescriptor).channel.use { iChannel ->
-                                    val byteBuffer = ByteBuffer.allocateDirect(1024)
-                                    while (iChannel.read(byteBuffer) != -1) {
-                                        byteBuffer.flip()
-                                        oChannel.write(byteBuffer)
-                                        byteBuffer.clear()
-                                    }
-                                }
-                            }
-                        }
+                        uri.writeToFile(file)
                     } else {
                         Log.e(TAG, "create file failed ${file.absolutePath}")
                     }
@@ -242,6 +242,21 @@ class FeiService : Service() {
                 Log.e(TAG, "saveFile: ", e)
             }
 
+        }
+
+        private fun Uri.writeToFile(file: File) {
+            file.outputStream().channel.use { oChannel ->
+                feiService.contentResolver.openFileDescriptor(this, "r")?.use { parcelFileDescriptor ->
+                    FileInputStream(parcelFileDescriptor.fileDescriptor).channel.use { iChannel ->
+                        val byteBuffer = ByteBuffer.allocateDirect(1024)
+                        while (iChannel.read(byteBuffer) != -1) {
+                            byteBuffer.flip()
+                            oChannel.write(byteBuffer)
+                            byteBuffer.clear()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -270,6 +285,9 @@ private fun Application.configureRouting(feiService: FeiService) {
                     })
                 )
             )
+        }
+        get("/messages") {
+            call.respond(ThymeleafContent("chat", mapOf()))
         }
         get("/shares") {
             val encodeToString = Json.encodeToString(shares.value)

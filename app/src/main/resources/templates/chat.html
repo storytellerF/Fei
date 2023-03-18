@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <style>
+        #message-list {
+            background-color: aquamarine;
+            flex-grow: 1;
+            padding: 8px;
+        }
+
+        #input-group {
+            display: flex;
+            margin-top: 8px;
+        }
+
+        #input {
+            flex-grow: 1;
+            font-size: large;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            margin: 8px;
+            height: calc(100vh - 16px);
+        }
+        button {
+            padding: 10px 14px;
+        }
+        .message-line {
+            display: flex;
+            min-height: 40px;
+            margin-bottom: 10px;
+        }
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            margin-right: 4px;
+            background-color: aliceblue;
+        }
+        .message-content {
+            flex-grow: 1;
+            height: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>template</h1>
+    <div id="message-list">
+        <div class="message-line" id="template">
+            <div class="message-avatar">
+                <img/>
+            </div>
+            
+            <div class="message-content">
+                <div class="message-user">
+
+                </div>
+                <div class="message-down">
+                    <div class="message-text">
+
+                    </div>
+                    <button class="copy-text">copy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="input-group">
+        <input id="input" />
+        <button>send</button>
+    </div>
+</body>
+<script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.8/dist/clipboard.min.js"></script>
+<script>
+    let messageList = document.getElementById("message-list")
+    let title = document.querySelector("h1")
+    let input = document.querySelector("#input")
+    let sendButton = document.querySelector("button")
+    let documentElement = document.documentElement
+    const template = document.getElementById("template")
+    console.log(template);
+
+    let address = 'ws://' + window.location.host + "/chat"
+    console.log(address);
+    var ws = new WebSocket(address);
+    ws.onmessage = function (msg) {
+        console.log(msg);
+        const p = flush(msg)
+        messageList.appendChild(p)
+    };
+    ws.onerror = function (e) {
+        console.log(e);
+    }
+    ws.onclose = function (params) {
+        console.log(params);
+    }
+    ws.onopen = function (params) {
+        console.log(params);
+    }
+    sendButton.onclick = function () {
+        console.log("send");
+        let content = input.value
+        ws.send(content)
+    }
+
+    function flush(msg) {
+        let element = template.cloneNode(true)
+        let params = JSON.parse(msg.data)
+        element.getElementsByClassName("message-user")[0].innerText = params.from
+        element.getElementsByClassName("message-text")[0].innerText = params.data
+        return element
+    }
+    new ClipboardJS('.copy-text', {
+        text: function (trigger) {
+            return trigger.previousElementSibling.innerText;
+        },
+    });
+</script>
+
+</html>
