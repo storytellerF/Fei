@@ -1,5 +1,7 @@
 package com.storyteller_f.fei.ui.components
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -18,10 +20,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
 import com.storyteller_f.fei.FeiService
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.allIp
-import com.storyteller_f.fei.createQRImage
+import java.util.*
+import java.util.stream.IntStream
 
 @Composable
 fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier) {
@@ -109,4 +115,23 @@ fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier) {
     }
 
 
+}
+
+fun String.createQRImage(width: Int, height: Int): Bitmap {
+    val bitMatrix = QRCodeWriter().encode(
+        this,
+        BarcodeFormat.QR_CODE,
+        width,
+        height,
+        Collections.singletonMap(EncodeHintType.CHARACTER_SET, "utf-8")
+    )
+    return Bitmap.createBitmap(
+        IntStream.range(0, height).flatMap { h: Int ->
+            IntStream.range(0, width).map { w: Int ->
+                if (bitMatrix[w, h]
+                ) Color.BLACK else Color.WHITE
+            }
+        }.toArray(),
+        width, height, Bitmap.Config.ARGB_8888
+    )
 }
