@@ -125,6 +125,7 @@ fun SettingPage(port: String = "8080") {
     }
 }
 
+@Preview
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun NavDrawer(closeDrawer: () -> Unit = {}, navigateTo: (String) -> Unit = {}, openAboutPage: () -> Unit = {}) {
@@ -143,7 +144,7 @@ fun NavDrawer(closeDrawer: () -> Unit = {}, navigateTo: (String) -> Unit = {}, o
         })
 
     NavigationDrawerItem(label = { Text(text = "messages") }, icon = {
-        Icon(Icons.Filled.AccountBox, contentDescription = "messages")
+        Icon(Icons.Filled.AccountBox, contentDescription = stringResource(R.string.messages))
     }, selected = false, onClick = {
         navigateTo("messages")
         closeDrawer()

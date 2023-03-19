@@ -19,4 +19,5 @@
     <string name="copied">copied</string>
     <string name="copy_link">copy link🔗</string>
     <string name="quick_selected_ip">quick to %s</string>
+    <string name="messages">Messages</string>
 </resources>

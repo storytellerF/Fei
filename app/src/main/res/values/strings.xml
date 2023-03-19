@@ -18,4 +18,5 @@
     <string name="copied">已复制</string>
     <string name="copy_link">复制链接🔗</string>
     <string name="quick_selected_ip">快速选择到：%s</string>
+    <string name="messages">消息</string>
 </resources>

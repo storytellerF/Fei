@@ -80,7 +80,7 @@ dependencies {
     implementation "io.ktor:ktor-server-netty:$ktor_version"
 
     implementation("io.ktor:ktor-server-webjars:$ktor_version")
-    implementation('org.webjars:jquery:3.6.3')
+    implementation('org.webjars:jquery:3.6.4')
     implementation("io.ktor:ktor-server-host-common:$ktor_version")
     implementation("io.ktor:ktor-server-status-pages:$ktor_version")
     implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")

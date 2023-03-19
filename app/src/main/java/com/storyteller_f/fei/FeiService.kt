@@ -163,10 +163,7 @@ class FeiService : Service() {
                     }
                 }
                 selfClient = httpClient
-                val coroutineExceptionHandler = CoroutineExceptionHandler { t, t1 ->
-
-                }
-                feiService.scope.launch(coroutineExceptionHandler) {
+                feiService.scope.launch {
                     httpClient.webSocket(method = HttpMethod.Get, host = "127.0.0.1", port = port, path = "/chat") {
                         selfSession = this
                         try {
