@@ -33,7 +33,7 @@ import java.util.stream.IntStream
 fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier) {
     val width = 200
     var selectedIp by remember {
-        mutableStateOf(FeiService.listenerAddress)
+        mutableStateOf(FeiService.defaultAddress)
     }
     val url by produceState(initialValue = "http://$selectedIp:$port/$sub", sub, selectedIp, port) {
         value = "http://$selectedIp:$port/$sub"
@@ -45,7 +45,7 @@ fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier) {
     }
     var expanded by remember { mutableStateOf(false) }
 
-    val ipList by produceState(initialValue = listOf(FeiService.listenerAddress)) {
+    val ipList by produceState(initialValue = listOf(FeiService.defaultAddress)) {
         value = allIp()
     }
     var quickSelectData by remember {

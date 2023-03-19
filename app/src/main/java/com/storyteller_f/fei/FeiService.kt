@@ -307,6 +307,7 @@ class FeiService : Service() {
         private const val foregroundChannelId = "foreground"
         const val defaultPort = 8080
         const val listenerAddress = "0.0.0.0"
+        const val defaultAddress = "127.0.0.1"
     }
 }
 
