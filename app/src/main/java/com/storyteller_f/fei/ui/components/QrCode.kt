@@ -58,7 +58,7 @@ fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier) {
             quickSelectData = it
         }
     }
-    val current = LocalClipboardManager.current
+    val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier.fillMaxWidth()) {
         val widthDp = LocalConfiguration.current.smallestScreenWidthDp - 100
@@ -97,7 +97,7 @@ fun ShowQrCode(sub: String, port: String, modifier: Modifier = Modifier) {
             }
         val stringResource by rememberUpdatedState(newValue = stringResource(R.string.copied))
         Button(onClick = {
-            current.setText(AnnotatedString(url))
+            clipboardManager.setText(AnnotatedString(url))
             Toast.makeText(context, stringResource, Toast.LENGTH_SHORT).show()
         }) {
             Text(text = stringResource(R.string.copy_link))

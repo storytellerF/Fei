@@ -143,7 +143,7 @@ fun NavDrawer(closeDrawer: () -> Unit = {}, navigateTo: (String) -> Unit = {}, o
             closeDrawer()
         })
 
-    NavigationDrawerItem(label = { Text(text = "messages") }, icon = {
+    NavigationDrawerItem(label = { Text(text = stringResource(R.string.messages)) }, icon = {
         Icon(Icons.Filled.AccountBox, contentDescription = stringResource(R.string.messages))
     }, selected = false, onClick = {
         navigateTo("messages")
