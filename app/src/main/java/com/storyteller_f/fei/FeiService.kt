@@ -123,13 +123,13 @@ class FeiService : Service() {
     class Fei(private val feiService: FeiService) : Binder() {
         private var server: ApplicationEngine? = null
         var channel: BroadcastChannel<SseEvent>? = null
-        var selfClient: HttpClient? = null
-        var selfSession: DefaultClientWebSocketSession? = null
+        private var selfClient: HttpClient? = null
+        private var selfSession: DefaultClientWebSocketSession? = null
         var port = defaultPort
         val messagesCache = MutableStateFlow(listOf<Message>())
 
         @OptIn(ExperimentalCoroutinesApi::class)
-        private fun startInternal() {
+        private suspend fun startInternal() {
             Log.d(TAG, "startInternal() called")
             try {
                 server = embeddedServer(Netty, port = port, host = listenerAddress) {
@@ -190,12 +190,13 @@ class FeiService : Service() {
             }
         }
 
-        private fun stopInternal() {
+        private suspend fun stopInternal() {
             Log.d(TAG, "stopInternal() called")
             feiService.postNotify("stopped")
+            selfSession?.close()
+            selfSession = null
             selfClient?.close()
             selfClient = null
-            selfSession = null
             server?.stop()
             server = null
             channel?.cancel()
@@ -210,13 +211,15 @@ class FeiService : Service() {
             Toast.makeText(feiService, "restarted", Toast.LENGTH_SHORT).show()
         }
 
-        fun restartAsync() {
+        suspend fun restartAsync() {
             stopInternal()
             startInternal()
         }
 
         fun stopAsync() {
-            stopInternal()
+            runBlocking {
+                stopInternal()
+            }
         }
 
         private fun Application.plugPlugins() {
