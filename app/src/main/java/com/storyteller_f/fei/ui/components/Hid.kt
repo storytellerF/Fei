@@ -94,9 +94,13 @@ fun HidScreen(
 
         HidState.NoBond -> {
             if (bondDevices.isEmpty()) {
-                Column(modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(text = "没有设备可供连接", modifier = Modifier.padding(8.dp))
                     Button(onClick = toBluetoothSettings) {
                         Text(text = "去配对")
@@ -117,23 +121,26 @@ fun HidScreen(
             }
         }
 
-        HidState.Done -> {
+        is HidState.Done -> {
             Column {
+                Text(text = "当前设备: ${bluetoothState.device.name}")
                 Row {
                     Button(onClick = {
                         sendText("fei")
                     }) {
                         Text(text = "fei")
                     }
-                    Button(onClick = {
-                        sendText("z")
-                    }) {
-                        Text(text = "z")
-                    }
-                    Button(onClick = {
-                        sendText("/")
-                    }) {
-                        Text(text = "/")
+                    if (bluetoothState.device.name.contains("Mac")) {
+                        Button(onClick = {
+                            sendText("z")
+                        }) {
+                            Text(text = "z")
+                        }
+                        Button(onClick = {
+                            sendText("/")
+                        }) {
+                            Text(text = "/")
+                        }
                     }
                 }
                 if (!keyboardInterceptor.contains(KeyboardInterfaceInterceptor.key)) {
@@ -151,6 +158,7 @@ fun HidScreen(
                 }
             }
         }
+
     }
 }
 
@@ -254,7 +262,7 @@ fun String.toKeyCode(block: (Pair<Int, Int>) -> Unit) {
                 block(it - 'a' + 4 to 0)
             }
 
-            in 'A' .. 'Z' -> {
+            in 'A'..'Z' -> {
                 block(it - 'A' to 2)
             }
 

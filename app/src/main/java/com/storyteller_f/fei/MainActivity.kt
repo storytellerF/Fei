@@ -1,6 +1,7 @@
 package com.storyteller_f.fei
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.content.*
 import android.content.pm.PackageManager
@@ -56,11 +57,11 @@ import kotlin.concurrent.thread
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
-enum class HidState {
-    BluetoothOff,
-    NoPermission,
-    NoBond,
-    Done,
+sealed class HidState {
+    object BluetoothOff : HidState()
+    object NoPermission : HidState()
+    object NoBond : HidState()
+    class Done(val device: ComposeBluetoothDevice) : HidState()
 }
 
 class MainActivity : ComponentActivity() {
@@ -172,21 +173,21 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val context = LocalContext.current
-            val state by produceState(
+            val state by produceState<HidState>(
                 initialValue = HidState.BluetoothOff,
                 bluetoothPermissionIndex,
                 bluetoothState,
                 selectedDevice
             ) {
+                val local = selectedDevice
                 value = when {
                     !bluetoothState -> HidState.BluetoothOff
                     !context.permissionOk() -> HidState.NoPermission
-                    selectedDevice == null -> {
+                    local == null -> {
                         HidState.NoBond
                     }
-
                     else -> {
-                        HidState.Done
+                        HidState.Done(local.composeBluetoothDevice())
                     }
                 }
             }
@@ -285,7 +286,7 @@ class MainActivity : ComponentActivity() {
                                 }
                                 composable("hid") {
                                     HidScreen(state, requestPermission, bondDevices.map {
-                                        ComposeBluetoothDevice(it.name, it.address)
+                                        it.composeBluetoothDevice()
                                     }, connectDevice, sendText)
                                 }
                             }
@@ -300,6 +301,10 @@ class MainActivity : ComponentActivity() {
         if (fei == null) bindService(intent, connection, 0)
         CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
     }
+
+    @SuppressLint("MissingPermission")
+    private fun BluetoothDevice.composeBluetoothDevice() =
+        ComposeBluetoothDevice(name, address)
 
     override fun onDestroy() {
         super.onDestroy()
