@@ -81,7 +81,7 @@ fun HidScreen(
 
         HidState.NoBond -> {
             if (bondDevices.isEmpty()) {
-                Text(text = "没有设备可供连接")
+                Text(text = "没有设备可供连接", modifier = Modifier.padding(8.dp))
             } else {
                 Column {
                     Text(text = "选择你的设备", modifier = Modifier.padding(8.dp), fontSize = 20.sp)
@@ -110,6 +110,13 @@ fun HidScreen(
                     sendText("/")
                 }) {
                     Text(text = "/")
+                }
+                Button(onClick = {
+                    if (!keyboardInterceptor.contains(Dvorak)) {
+                        keyboardInterceptor.add(Dvorak)
+                    }
+                }) {
+                    Text(text = "我使用了Dvorak 特殊键盘布局")
                 }
             }
         }
@@ -158,7 +165,7 @@ fun Context.registerApp(
         }
         val sdp = BluetoothHidDeviceAppSdpSettings(
             "fei",
-            "auth input adress",
+            "auth input address",
             "provider",
             BluetoothHidDevice.SUBCLASS1_COMBO,
             MainActivity.Descriptor
@@ -208,7 +215,9 @@ fun Context.sendReport(
 }
 
 fun String.toKeyCode(block: (Pair<Int, Int>) -> Unit) {
-    forEach {
+    keyboardInterceptor.fold(this) { s, f ->
+        f.intercept(s)
+    }.forEach {
         when (it) {
             in 'a'..'z' -> {
                 block(it - 'a' + 4 to 0)
@@ -220,11 +229,33 @@ fun String.toKeyCode(block: (Pair<Int, Int>) -> Unit) {
 
             '0' -> block(39 to 0)
             '-' -> block(45 to 0)
+            '=' -> block(46 to 0)
             ':' -> block(51 to 2)
             '.' -> block(55 to 0)
             '/' -> block(56 to 0)
             else -> throw Exception("$it not recognized")
         }
 
+    }
+}
+
+val keyboardInterceptor = mutableListOf<KeyboardInterceptor>()
+
+const val qwerty = "-=qwertyuiop[]asdfghjkl;'zxcvbnm,./"
+const val dvorak = "']x,doktfgsr-=a;hyujcvpzq/bi.nlmwe["
+
+interface KeyboardInterceptor {
+    fun intercept(data: String): String
+}
+
+object Dvorak : KeyboardInterceptor {
+    override fun intercept(data: String): String {
+        assert(qwerty.length == dvorak.length)
+        return data.map {
+            val indexOf = qwerty.indexOf(it)
+            if (indexOf >= 0) {
+                dvorak[indexOf]
+            } else it
+        }.joinToString("")
     }
 }

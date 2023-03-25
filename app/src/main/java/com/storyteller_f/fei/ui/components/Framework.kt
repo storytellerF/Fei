@@ -101,7 +101,10 @@ fun FeiMainToolbar(
                     })
             },
             text = {
-                ShowQrCode(sub = "", port = port)
+                ShowQrCode(sub = "", port = port) {
+                    showDialog = false
+                    sendText(it)
+                }
             },
             properties = DialogProperties(
                 usePlatformDefaultWidth = false

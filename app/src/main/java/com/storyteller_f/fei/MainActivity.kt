@@ -169,17 +169,7 @@ class MainActivity : ComponentActivity() {
                 result
             } else false
         }
-        val sendText: (String) -> Unit = {
-            val hid = hidDevice
-            val device = selectedDevice
-            if (hid != null && device != null) {
-                it.toKeyCode { code ->
-                    sendReport(hid, device, code.second, code.first)
-                }
-            } else {
 
-            }
-        }
         setContent {
             val context = LocalContext.current
             val state by produceState(
@@ -211,6 +201,18 @@ class MainActivity : ComponentActivity() {
             val configuration = LocalConfiguration.current
             val screenHeight = with(density) { configuration.screenHeightDp.dp.roundToPx() }
             val currentBackStackEntryAsState by navController.currentBackStackEntryAsState()
+
+            val sendText: (String) -> Unit = {
+                val hid = hidDevice
+                val device = selectedDevice
+                if (hid != null && device != null) {
+                    it.toKeyCode { code ->
+                        sendReport(hid, device, code.second, code.first)
+                    }
+                } else {
+                    navController.navigate("hid")
+                }
+            }
             FeiTheme {
                 ModalNavigationDrawer(drawerContent = {
                     ModalDrawerSheet {
