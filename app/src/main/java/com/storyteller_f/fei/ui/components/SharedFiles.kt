@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -16,7 +17,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.storyteller_f.fei.service.SharedFileInfo
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import com.storyteller_f.fei.R
@@ -65,8 +65,8 @@ fun SharedFile(
         }
         .fillMaxWidth()
         .padding(10.dp)) {
-        Text(text = info.name, fontSize = 14.sp)
-        Text(text = info.uri, fontSize = 10.sp)
+        Text(text = info.name, style = MaterialTheme.typography.titleMedium)
+        Text(text = info.uri, style = MaterialTheme.typography.labelSmall)
 
         DropdownMenu(
             expanded = expanded,
