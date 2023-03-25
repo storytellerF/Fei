@@ -219,11 +219,11 @@ fun Context.registerApp(
     }
 }
 
-fun Context.unRegister(hidDevice: BluetoothHidDevice?) {
+fun unRegister(context: Context, hidDevice: BluetoothHidDevice?) {
     hidDevice ?: return
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
         if (ActivityCompat.checkSelfPermission(
-                this,
+                context,
                 Manifest.permission.BLUETOOTH_CONNECT
             ) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -233,7 +233,8 @@ fun Context.unRegister(hidDevice: BluetoothHidDevice?) {
     }
 }
 
-fun Context.sendReport(
+fun sendReport(
+    context: Context,
     hidDevice: BluetoothHidDevice,
     selectedDevice: BluetoothDevice,
     m: Int,
@@ -241,7 +242,7 @@ fun Context.sendReport(
 ) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
         if (ActivityCompat.checkSelfPermission(
-                this,
+                context,
                 Manifest.permission.BLUETOOTH_CONNECT
             ) != PackageManager.PERMISSION_GRANTED
         ) {

@@ -157,8 +157,7 @@ class MainActivity : ComponentActivity() {
             override fun onDestroy(owner: LifecycleOwner) {
                 super.onDestroy(owner)
                 unregisterReceiver(bluetoothStateReceiver)
-                unRegister(hidDevice)
-
+                unRegister(this@MainActivity, hidDevice)
             }
         })
         val connectDevice: (String) -> Boolean = { address ->
@@ -208,7 +207,7 @@ class MainActivity : ComponentActivity() {
                 val device = selectedDevice
                 if (hid != null && device != null) {
                     it.toKeyCode { code ->
-                        sendReport(hid, device, code.second, code.first)
+                        sendReport(this@MainActivity, hid, device, code.second, code.first)
                     }
                 } else {
                     navController.navigate("hid")
