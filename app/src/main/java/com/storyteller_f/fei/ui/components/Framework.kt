@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.jamal.composeprefs3.ui.PrefsScreen
 import com.jamal.composeprefs3.ui.prefs.EditTextPref
-import com.storyteller_f.fei.FeiService
+import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.dataStore
 

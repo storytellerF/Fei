@@ -33,7 +33,7 @@
             </intent-filter>
         </activity>
         <service
-            android:name=".FeiService"
+            android:name=".service.FeiService"
             android:enabled="true"
             android:exported="false" />
     </application>

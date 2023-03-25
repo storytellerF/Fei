@@ -5,6 +5,7 @@ import android.content.Intent
 import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.core.net.toUri
+import com.storyteller_f.fei.service.SharedFileInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex

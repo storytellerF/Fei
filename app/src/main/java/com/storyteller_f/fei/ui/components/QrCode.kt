@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
-import com.storyteller_f.fei.FeiService
+import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.allIp
 import java.util.Collections

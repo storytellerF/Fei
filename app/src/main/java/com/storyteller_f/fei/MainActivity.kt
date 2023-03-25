@@ -40,6 +40,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.storyteller_f.fei.service.FeiService
+import com.storyteller_f.fei.service.SharedFileInfo
+import com.storyteller_f.fei.service.SseEvent
+import com.storyteller_f.fei.service.portFlow
 import com.storyteller_f.fei.ui.components.*
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.Dispatchers
@@ -87,7 +91,7 @@ class MainActivity : ComponentActivity() {
                     removeUri(path)
                 }
                 cacheInvalid()
-                fei?.channel?.trySend(SseEvent(data = "refresh"))
+                fei?.feiService?.server?.channel?.trySend(SseEvent(data = "refresh"))
             }
         }
         val saveToLocal: (SharedFileInfo) -> Unit = {
@@ -305,7 +309,7 @@ class MainActivity : ComponentActivity() {
     fun Messages() {
         val fei = fei
         if (fei != null) {
-            val collectAsState by fei.messagesCache.collectAsState()
+            val collectAsState by fei.feiService.server.messagesCache.collectAsState()
             MessagePage(collectAsState) {
                 fei.sendMessage(it)
             }
@@ -328,7 +332,7 @@ class MainActivity : ComponentActivity() {
             file.appendText("\n$uri")
         }
         cacheInvalid()
-        fei?.channel?.send(SseEvent("refresh"))
+        fei?.feiService?.server?.channel?.send(SseEvent("refresh"))
     }
 
     var fei: FeiService.Fei? = null

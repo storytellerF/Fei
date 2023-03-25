@@ -17,7 +17,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.storyteller_f.fei.SharedFileInfo
+import com.storyteller_f.fei.service.SharedFileInfo
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import com.storyteller_f.fei.R
 
