@@ -75,6 +75,7 @@ fun SharedFile(
             DropdownMenuItem(text = {
                 Text(text = stringResource(R.string.delete))
             }, onClick = {
+                expanded = false
                 deleteItem(info)
             })
             val uri = Uri.parse(info.uri)
@@ -82,13 +83,14 @@ fun SharedFile(
                 DropdownMenuItem(
                     text = { Text(text = stringResource(R.string.save_to_local)) },
                     onClick = {
-                        saveToLocal(info)
                         expanded = false
+                        saveToLocal(info)
                     })
             if (allowView)
                 DropdownMenuItem(text = {
                     Text(text = stringResource(R.string.view))
                 }, onClick = {
+                    expanded = false
                     viewInfo(info)
                 })
         }

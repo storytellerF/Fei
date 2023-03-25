@@ -156,6 +156,7 @@ class FeiService : Service() {
                     configureRouting(feiService)
                     webSocketsService()
                 }.start(wait = false)
+                Log.i(TAG, "startInternal: $server")
                 val httpClient = HttpClient(CIO) {
                     install(io.ktor.client.plugins.websocket.WebSockets) {
                         pingInterval = 20_000

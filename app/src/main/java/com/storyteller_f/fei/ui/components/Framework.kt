@@ -1,5 +1,6 @@
 package com.storyteller_f.fei.ui.components
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
@@ -37,6 +38,7 @@ fun FeiMainToolbar(
     port: String = "8080",
     restartService: () -> Unit = {},
     stopService: () -> Unit = {},
+    sendText: (String) -> Unit = {},
     openDrawer: () -> Unit = {},
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
@@ -149,6 +151,15 @@ fun NavDrawer(closeDrawer: () -> Unit = {}, navigateTo: (String) -> Unit = {}, o
         navigateTo("messages")
         closeDrawer()
     })
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        NavigationDrawerItem(label = { Text(text = "hid") }, icon = {
+            Icon(Icons.Filled.Favorite, contentDescription = stringResource(R.string.messages))
+        }, selected = false, onClick = {
+            navigateTo("hid")
+            closeDrawer()
+        })
+    }
 
     NavigationDrawerItem(
         label = {
