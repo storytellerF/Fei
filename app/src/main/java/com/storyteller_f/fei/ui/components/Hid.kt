@@ -27,11 +27,13 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import com.storyteller_f.fei.HidState
 import com.storyteller_f.fei.MainActivity
+import com.storyteller_f.fei.R
 import java.util.concurrent.Executors
 
 class ComposeBluetoothDevice(val name: String, val address: String)
@@ -81,14 +83,14 @@ fun HidScreen(
     }
     when (bluetoothState) {
         HidState.BluetoothOff -> {
-            Text(text = "请打开蓝牙")
+            Text(text = stringResource(R.string.bluetooth_off_tip))
         }
 
         HidState.NoPermission -> {
             Button(onClick = {
                 requestPermission()
             }) {
-                Text(text = "没有权限，点击授权访问Bluetooth Connect")
+                Text(text = stringResource(R.string.bluetooth_permission_tip))
             }
         }
 
@@ -101,16 +103,16 @@ fun HidScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "没有设备可供连接", modifier = Modifier.padding(8.dp))
+                    Text(text = stringResource(R.string.no_bond_device_tip), modifier = Modifier.padding(8.dp))
                     Button(onClick = toBluetoothSettings) {
-                        Text(text = "去配对")
+                        Text(text = stringResource(R.string.bluetooth_pair_tip))
                     }
                 }
             } else {
                 Column {
-                    Text(text = "选择你的设备", modifier = Modifier.padding(8.dp), fontSize = 20.sp)
+                    Text(text = stringResource(R.string.bond_devices_tip), modifier = Modifier.padding(8.dp), fontSize = 20.sp)
                     Button(onClick = toBluetoothSettings) {
-                        Text(text = "找不到预期的设备，去配对")
+                        Text(text = stringResource(R.string.no_expacted_bluetooth_pair_tip))
                     }
                     LazyColumn {
                         items(bondDevices.size) {
@@ -123,8 +125,9 @@ fun HidScreen(
 
         is HidState.Done -> {
             Column {
-                Text(text = "当前设备: ${bluetoothState.device.name}")
+                Text(text = stringResource(id = R.string.connected_device_tip, bluetoothState.device.name))
                 Row {
+                    Text(text = stringResource(R.string.test_case))
                     Button(onClick = {
                         sendText("fei")
                     }) {
@@ -147,13 +150,13 @@ fun HidScreen(
                     Button(onClick = {
                         keyboardInterceptor.putIfAbsent(KeyboardInterfaceInterceptor.key, Dvorak)
                     }) {
-                        Text(text = "我使用了Dvorak 特殊键盘布局")
+                        Text(text = stringResource(R.string.plug_dvorak_keyboard_style))
                     }
                 } else {
                     Button(onClick = {
                         keyboardInterceptor.remove(KeyboardInterfaceInterceptor.key)
                     }) {
-                        Text(text = "移除Dvorak 键盘布局")
+                        Text(text = stringResource(R.string.unplug_dvorak_keyboard_style))
                     }
                 }
             }

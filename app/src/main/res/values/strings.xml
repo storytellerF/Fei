@@ -19,4 +19,14 @@
     <string name="copy_link">复制链接🔗</string>
     <string name="quick_selected_ip">快速选择到：%s</string>
     <string name="messages">消息</string>
+    <string name="bluetooth_off_tip" translatable="false">请打开蓝牙</string>
+    <string name="bluetooth_permission_tip" translatable="false">没有权限，点击授权访问Bluetooth Connect</string>
+    <string name="no_bond_device_tip" translatable="false">没有设备可供连接</string>
+    <string name="bond_devices_tip" translatable="false">选择你的设备</string>
+    <string name="bluetooth_pair_tip" translatable="false">去配对</string>
+    <string name="no_expacted_bluetooth_pair_tip" translatable="false">找不到预期的设备，去配对</string>
+    <string name="connected_device_tip">当前设备: %s</string>
+    <string name="plug_dvorak_keyboard_style">我使用了Dvorak 特殊键盘布局</string>
+    <string name="unplug_dvorak_keyboard_style">移除Dvorak 键盘布局</string>
+    <string name="test_case">测试用例</string>
 </resources>

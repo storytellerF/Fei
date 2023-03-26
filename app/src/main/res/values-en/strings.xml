@@ -20,4 +20,8 @@
     <string name="copy_link">copy link🔗</string>
     <string name="quick_selected_ip">quick to %s</string>
     <string name="messages">Messages</string>
+    <string name="connected_device_tip">connected: %s</string>
+    <string name="plug_dvorak_keyboard_style">use Dvorak</string>
+    <string name="unplug_dvorak_keyboard_style">remove Dvorak</string>
+    <string name="test_case">test case</string>
 </resources>
