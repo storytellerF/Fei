@@ -43,14 +43,15 @@ fun BoundDevice(device: ComposeBluetoothDevice, connectDevice: (String) -> Boole
     Column(
         modifier = Modifier
             .padding(8.dp)
+            .clickable {
+                connectDevice(device.address)
+            }
             .background(
                 MaterialTheme.colorScheme.tertiaryContainer,
                 shape = RoundedCornerShape(4.dp)
             )
             .padding(8.dp)
-            .clickable {
-                connectDevice(device.address)
-            }
+
     ) {
         val modifier = Modifier
             .padding(top = 8.dp)
@@ -103,14 +104,20 @@ fun HidScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = stringResource(R.string.no_bond_device_tip), modifier = Modifier.padding(8.dp))
+                    Text(
+                        text = stringResource(R.string.no_bond_device_tip),
+                        modifier = Modifier.padding(8.dp)
+                    )
                     Button(onClick = toBluetoothSettings) {
                         Text(text = stringResource(R.string.bluetooth_pair_tip))
                     }
                 }
             } else {
-                Column {
-                    Text(text = stringResource(R.string.bond_devices_tip), modifier = Modifier.padding(8.dp), fontSize = 20.sp)
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.bond_devices_tip),
+                        fontSize = 20.sp
+                    )
                     Button(onClick = toBluetoothSettings) {
                         Text(text = stringResource(R.string.no_expacted_bluetooth_pair_tip))
                     }
@@ -125,7 +132,12 @@ fun HidScreen(
 
         is HidState.Done -> {
             Column {
-                Text(text = stringResource(id = R.string.connected_device_tip, bluetoothState.device.name))
+                Text(
+                    text = stringResource(
+                        id = R.string.connected_device_tip,
+                        bluetoothState.device.name
+                    )
+                )
                 Row {
                     Text(text = stringResource(R.string.test_case))
                     Button(onClick = {
