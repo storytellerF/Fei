@@ -47,10 +47,8 @@ import com.storyteller_f.fei.service.SseEvent
 import com.storyteller_f.fei.service.portFlow
 import com.storyteller_f.fei.ui.components.*
 import com.storyteller_f.fei.ui.theme.FeiTheme
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.*
 import kotlin.concurrent.thread
@@ -182,12 +180,8 @@ class MainActivity : ComponentActivity() {
                 value = when {
                     !bluetoothState -> HidState.BluetoothOff
                     !context.permissionOk() -> HidState.NoPermission
-                    local == null -> {
-                        HidState.NoBond
-                    }
-                    else -> {
-                        HidState.Done(local.composeBluetoothDevice())
-                    }
+                    local == null -> HidState.NoBond
+                    else -> HidState.Done(local.composeBluetoothDevice())
                 }
             }
             val port by LocalContext.current.portFlow.collectAsState(initial = FeiService.defaultPort)
@@ -333,10 +327,7 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ObsoleteCoroutinesApi::class)
     private suspend fun saveUri(uri: Uri) {
-        val file = savedUriFile()
-        withContext(Dispatchers.IO) {
-            file.appendText("\n$uri")
-        }
+        savedUriFile.appendText(uri.toString())
         cacheInvalid()
         fei?.feiService?.server?.channel?.send(SseEvent("refresh"))
     }

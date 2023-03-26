@@ -12,36 +12,72 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
 
 val shares = MutableStateFlow<List<SharedFileInfo>>(listOf())
 
-suspend fun Context.savedUriFile(): File {
-    return File(filesDir, "list.txt").also { listFile ->
-        if (!listFile.exists()) withContext(Dispatchers.IO) {
-            listFile.createNewFile()
-        }
-    }
+val savedUriFile: MappedByteBuffer by lazy {
+    val file = File("/data/data/com.storyteller_f.fei/files/list.txt")
+    val channel = FileChannel.open(
+        file.toPath(),
+        StandardOpenOption.READ,
+        StandardOpenOption.WRITE,
+        StandardOpenOption.CREATE
+    )
+    channel.map(FileChannel.MapMode.READ_WRITE, 0, 1024)
 }
 
-suspend fun Context.removeUri(path: SharedFileInfo) {
-    val file = savedUriFile()
+fun Context.removeUri(path: SharedFileInfo) {
+    val file = savedUriFile
     try {
-        withContext(Dispatchers.IO) {
-            val readText = file.readText()
-            readText.trim().split("\n").filter {
-                it.isNotEmpty() && it != path.uri
-            }.joinToString("\n").let {
-                file.writeText(it)
-            }
+        val readText = file.readText()
+        readText.trim().split("\n").filter {
+            it.isNotEmpty() && it != path.uri
+        }.joinToString("\n").let {
+            file.writeText(it)
         }
+
         //todo contentResolver.outgoingPersistedUriPermissions
-        contentResolver.releasePersistableUriPermission(path.uri.toUri(), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        if (contentResolver.outgoingPersistedUriPermissions.any {
+                it.uri.toString() == path.uri
+            })
+            contentResolver.releasePersistableUriPermission(
+                path.uri.toUri(),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
     } catch (e: Exception) {
         Toast.makeText(this, e.localizedMessage, Toast.LENGTH_LONG).show()
     }
 
 
 }
+
+private fun MappedByteBuffer.writeText(it: String) {
+    position(0)
+    put(it.toByteArray() + 0)
+}
+
+private fun MappedByteBuffer.readText(): String {
+    val bytes = ByteArray(1024)
+    position(0)
+    var index = 0
+    while (true) {
+        val b = get()
+        if (b.toInt() != 0)
+            bytes[index++] = b
+        else break
+    }
+    return String(bytes, 0, index)
+}
+
+fun MappedByteBuffer.appendText(s: String) {
+    val old = readText()
+    val new = old + (if (old.isEmpty()) "" else "\n") + s
+    writeText(new)
+}
+
 
 val mutex = Mutex()
 
@@ -51,8 +87,8 @@ suspend fun Context.cacheInvalid() = withContext(Dispatchers.IO) {
     }
 }
 
-private suspend fun Context.cacheInvalidInternal(): Boolean {
-    val listFile = savedUriFile()
+private fun Context.cacheInvalidInternal(): Boolean {
+    val listFile = savedUriFile
     val readText = listFile.readText()
     val savedList = readText.split("\n").filter {
         it.isNotEmpty()
