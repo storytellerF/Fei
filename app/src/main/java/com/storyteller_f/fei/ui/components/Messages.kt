@@ -90,7 +90,7 @@ fun MessagePage(@PreviewParameter(MessageContentProvider::class) messageList: Li
                 sendMessage(content)
                 content = ""
             }, modifier = Modifier.padding(start = 8.dp)) {
-                Text(text = "send")
+                Text(text = stringResource(R.string.send))
             }
         }
     }

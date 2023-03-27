@@ -29,4 +29,5 @@
     <string name="plug_dvorak_keyboard_style">我使用了Dvorak 特殊键盘布局</string>
     <string name="unplug_dvorak_keyboard_style">移除Dvorak 键盘布局</string>
     <string name="test_case">测试用例</string>
+    <string name="send">发送</string>
 </resources>

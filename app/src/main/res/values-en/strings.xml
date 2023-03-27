@@ -24,4 +24,5 @@
     <string name="plug_dvorak_keyboard_style">use Dvorak</string>
     <string name="unplug_dvorak_keyboard_style">remove Dvorak</string>
     <string name="test_case">test case</string>
+    <string name="send">send</string>
 </resources>

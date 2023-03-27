@@ -20,14 +20,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -69,38 +78,60 @@ fun BoundDevice(device: ComposeBluetoothDevice, connectDevice: (String) -> Boole
     }
 }
 
+class HidPreviewProvider : PreviewParameterProvider<HidState> {
+    override val values: Sequence<HidState>
+        get() = sequenceOf(
+            HidState.BluetoothOff, HidState.NoPermission, HidState.NoBond, HidState.Done(
+                ComposeBluetoothDevice("name", "address")
+            )
+        )
+
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview
 @Composable
 fun HidScreen(
-    bluetoothState: HidState,
+    @PreviewParameter(HidPreviewProvider::class) bluetoothState: HidState,
     requestPermission: () -> Unit = {},
     bondDevices: List<ComposeBluetoothDevice> = listOf(),
-    connectDevice: (String) -> Boolean,
+    connectDevice: (String) -> Boolean = { false },
     sendText: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
+    var content by remember {
+        mutableStateOf("")
+    }
     val toBluetoothSettings = {
         val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS)
         context.startActivity(intent)
     }
+
+    val rootModifier = Modifier
+        .fillMaxWidth()
+        .fillMaxHeight()
     when (bluetoothState) {
         HidState.BluetoothOff -> {
-            Text(text = stringResource(R.string.bluetooth_off_tip))
+            OneCenter {
+                Text(text = stringResource(R.string.bluetooth_off_tip))
+            }
         }
 
         HidState.NoPermission -> {
-            Button(onClick = {
-                requestPermission()
-            }) {
-                Text(text = stringResource(R.string.bluetooth_permission_tip))
+            OneCenter {
+                Button(onClick = {
+                    requestPermission()
+                }) {
+                    Text(text = stringResource(R.string.bluetooth_permission_tip))
+                }
             }
+
         }
 
         HidState.NoBond -> {
             if (bondDevices.isEmpty()) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .fillMaxHeight(),
+                    modifier = rootModifier,
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -113,7 +144,7 @@ fun HidScreen(
                     }
                 }
             } else {
-                Column(modifier = Modifier.padding(8.dp)) {
+                Column(modifier = rootModifier.padding(8.dp)) {
                     Text(
                         text = stringResource(R.string.bond_devices_tip),
                         fontSize = 20.sp
@@ -131,15 +162,15 @@ fun HidScreen(
         }
 
         is HidState.Done -> {
-            Column {
+            Column(modifier = rootModifier.padding(8.dp)) {
                 Text(
                     text = stringResource(
                         id = R.string.connected_device_tip,
                         bluetoothState.device.name
-                    )
+                    ), style = MaterialTheme.typography.titleMedium
                 )
+                Text(text = stringResource(R.string.test_case))
                 Row {
-                    Text(text = stringResource(R.string.test_case))
                     Button(onClick = {
                         sendText("fei")
                     }) {
@@ -156,6 +187,16 @@ fun HidScreen(
                         }) {
                             Text(text = "/")
                         }
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextField(value = content, onValueChange = {
+                        content = it
+                    }, modifier = Modifier.weight(1f))
+                    Button(onClick = {
+                        sendText(content)
+                    }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                        Text(text = stringResource(id = R.string.send))
                     }
                 }
                 if (!keyboardInterceptor.contains(KeyboardInterfaceInterceptor.key)) {

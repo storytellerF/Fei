@@ -3,7 +3,11 @@ package com.storyteller_f.fei.ui.components
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,9 +31,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.jamal.composeprefs3.ui.PrefsScreen
 import com.jamal.composeprefs3.ui.prefs.EditTextPref
-import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.dataStore
+import com.storyteller_f.fei.service.FeiService
 
 @Preview
 @Composable
@@ -191,4 +195,9 @@ fun NavDrawer(closeDrawer: () -> Unit = {}, navigateTo: (String) -> Unit = {}, o
             navigateTo("settings")
             closeDrawer()
         })
+}
+
+@Composable
+fun OneCenter(content: @Composable BoxScope.() -> Unit) {
+    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center, content = content)
 }
