@@ -25,7 +25,7 @@ jobs:
     - name: Build with Gradle
       run: ./gradlew build
       
-    - uses: r0adkll/sign-android-release@v1
+    - uses: noriban/sign-android-release@v3
       name: Sign app APK
       # ID used to access action output
       id: sign_app
