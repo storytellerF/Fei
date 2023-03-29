@@ -1,0 +1,78 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: set up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Build with Gradle
+      run: ./gradlew build
+      
+    - uses: r0adkll/sign-android-release@v1
+      name: Sign app APK
+      # ID used to access action output
+      id: sign_app
+      with:
+        releaseDirectory: app/build/outputs/apk/release
+        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+        alias: ${{ secrets.ALIAS }}
+        keyStorePassword: ${{ secrets.STORE_PASSWORD }}
+        keyPassword: ${{ secrets.KEY_PASSWORD }}
+      env:
+        # override default build-tools version (29.0.3) -- optional
+        BUILD_TOOLS_VERSION: "33.0.1"
+
+    # Example use of `signedReleaseFile` output -- not needed
+    - uses: actions/upload-artifact@v2
+      with:
+        name: Signed app bundle
+        path: ${{steps.sign_app.outputs.signedReleaseFile}}
+
+    - name: Echo APK
+      run: echo Signed APK FILE ${{steps.sign_app.outputs.signedReleaseFile}}
+
+  release:
+    name: Release APK
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK from build
+        uses: actions/download-artifact@v1
+        with:
+          name: Signed app bundle  
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }} 
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }} 
+      - name: Upload Release APK
+        id: upload_release_asset
+        uses: actions/upload-release-asset@v1.0.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: Signed app bundle/app-release-unsigned-signed.apk
+          asset_name: release.apk
+          asset_content_type: application/zip
+
