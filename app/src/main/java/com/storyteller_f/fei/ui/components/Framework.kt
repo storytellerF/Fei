@@ -44,6 +44,7 @@ fun FeiMainToolbar(
     stopService: () -> Unit = {},
     sendText: (String) -> Unit = {},
     openDrawer: () -> Unit = {},
+    deleteAll: () -> Unit = {},
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
 
@@ -90,6 +91,13 @@ fun FeiMainToolbar(
                     ImageVector.vectorResource(id = R.drawable.baseline_stop_24),
                     contentDescription = stringResource(R.string.stop_service)
                 )
+            }
+            IconButton(onClick = {
+                deleteAll()
+            }) {
+                Icon(ImageVector.vectorResource(id = R.drawable.baseline_delete_24), contentDescription = stringResource(
+                                    R.string.delete_all)
+                                )
             }
         },
 
@@ -199,5 +207,7 @@ fun NavDrawer(closeDrawer: () -> Unit = {}, navigateTo: (String) -> Unit = {}, o
 
 @Composable
 fun OneCenter(content: @Composable BoxScope.() -> Unit) {
-    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(), contentAlignment = Alignment.Center, content = content)
+    Box(modifier = Modifier
+        .fillMaxWidth()
+        .fillMaxHeight(), contentAlignment = Alignment.Center, content = content)
 }

@@ -232,19 +232,23 @@ class MainActivity : ComponentActivity() {
                             port.toString(),
                             { fei?.restart() },
                             { fei?.stop() },
-                            sendText
-                        ) {
-                            scope.launch {
-                                drawerState.open()
+                            sendText,
+                            {
+                                scope.launch {
+                                    drawerState.open()
+                                }
+                            },
+                            {
+                                shares.value.forEach(deleteItem)
                             }
-                        }
+                        )
                     }, floatingActionButton = {
                         val text = currentBackStackEntryAsState?.destination?.route.orEmpty()
                         if (text != "messages")
                             FloatingActionButton(onClick = {
                                 pickFile.launch(arrayOf("*/*"))
                             }) {
-                                Icon(Icons.Filled.Add, contentDescription = "add file")
+                                Icon(Icons.Filled.Add, contentDescription = getString(R.string.add_file))
                             }
                     }, snackbarHost = {
                         SnackbarHost(hostState = snackBarHostState) {

@@ -88,14 +88,13 @@ suspend fun Context.cacheInvalid() = withContext(Dispatchers.IO) {
 }
 
 private fun Context.cacheInvalidInternal(): Boolean {
-    val listFile = savedUriFile
-    val readText = listFile.readText()
+    val readText = savedUriFile.readText()
     val savedList = readText.split("\n").filter {
         it.isNotEmpty()
     }.mapNotNull {
         sharedFileInfo(it)
     }
-    listFile.writeText(savedList.joinToString("\n") {
+    savedUriFile.writeText(savedList.joinToString("\n") {
         it.uri
     })
     val savedFiles = File(filesDir, "saved").listFiles()?.let {

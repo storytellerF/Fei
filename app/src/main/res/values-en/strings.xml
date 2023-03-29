@@ -25,4 +25,6 @@
     <string name="unplug_dvorak_keyboard_style">remove Dvorak</string>
     <string name="test_case">test case</string>
     <string name="send">send</string>
+    <string name="add_file">add file</string>
+    <string name="delete_all">delete all</string>
 </resources>
