@@ -24,7 +24,7 @@ jobs:
     - name: Build with Gradle
       run: ./gradlew build
       
-    - uses: r0adkll/sign-android-release@v1
+    - uses: noriban/sign-android-release@v3
       name: Sign app APK
       # ID used to access action output
       id: sign_app
@@ -39,7 +39,7 @@ jobs:
         BUILD_TOOLS_VERSION: "33.0.1"
 
     # Example use of `signedReleaseFile` output -- not needed
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: Signed app bundle
         path: ${{steps.sign_app.outputs.signedReleaseFile}}
@@ -54,25 +54,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download APK from build
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
-          name: Signed app bundle  
+          name: Signed app bundle
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }} 
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }} 
-      - name: Upload Release APK
-        id: upload_release_asset
-        uses: actions/upload-release-asset@v1.0.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: Signed app bundle/app-release-unsigned-signed.apk
-          asset_name: release.apk
-          asset_content_type: application/zip
+          name: Release ${{ github.ref }}
+          files: ./*.apk
 
