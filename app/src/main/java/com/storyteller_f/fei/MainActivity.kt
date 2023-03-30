@@ -89,7 +89,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     removeUri(path)
                 }
-                cacheInvalid()
+                cacheInvalid()//when delete
                 fei?.feiService?.server?.channel?.trySend(SseEvent(data = "refresh"))
             }
         }
@@ -332,7 +332,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ObsoleteCoroutinesApi::class)
     private suspend fun saveUri(uri: Uri) {
         savedUriFile.appendText(uri.toString())
-        cacheInvalid()
+        cacheInvalid()//when save
         fei?.feiService?.server?.channel?.send(SseEvent("refresh"))
     }
 
@@ -426,7 +426,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         lifecycleScope.launch {
-            cacheInvalid()
+            cacheInvalid()//when resume
         }
     }
 

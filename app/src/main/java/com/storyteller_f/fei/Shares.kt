@@ -40,20 +40,20 @@ fun Context.removeUri(path: SharedFileInfo) {
     val file = savedUriFile
     try {
         val readText = file.readText()
-        readText.trim().split("\n").filter {
+        val valid = readText.trim().split("\n").filter {
             it.isNotEmpty() && it != path.uri
-        }.joinToString("\n").let {
+        }
+        valid.joinToString("\n").let {
             file.writeText(it)
         }
-
-        //todo contentResolver.outgoingPersistedUriPermissions
-        if (contentResolver.outgoingPersistedUriPermissions.any {
-                it.uri.toString() == path.uri
-            })
-            contentResolver.releasePersistableUriPermission(
-                path.uri.toUri(),
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
+        contentResolver.outgoingPersistedUriPermissions.forEach {
+            if (!valid.contains(it.uri.toString())) {
+                contentResolver.releasePersistableUriPermission(
+                    path.uri.toUri(),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+        }
     } catch (e: Exception) {
         Toast.makeText(this, e.localizedMessage, Toast.LENGTH_LONG).show()
     }
@@ -95,13 +95,14 @@ suspend fun Context.cacheInvalid() = withContext(Dispatchers.IO) {
 }
 
 private fun Context.cacheInvalidInternal(): Boolean {
-    val readText = savedUriFile.readText()
-    val savedList = readText.split("\n").filter {
+    val buffer = savedUriFile
+    val content = buffer.readText()
+    val savedList = content.split("\n").filter {
         it.isNotEmpty()
     }.mapNotNull {
         sharedFileInfo(it)
     }
-    savedUriFile.writeText(savedList.joinToString("\n") {
+    buffer.writeText(savedList.joinToString("\n") {
         it.uri
     })
     val savedFiles = File(filesDir, "saved").listFiles()?.let {

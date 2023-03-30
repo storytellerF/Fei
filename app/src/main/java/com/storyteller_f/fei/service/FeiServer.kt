@@ -202,7 +202,7 @@ class FeiServer(private val feiService: FeiService) {
         feiService.scope.launch {
             saveFile(File(info.name).extension, uri)
             feiService.removeUri(info)
-            feiService.cacheInvalid()
+            feiService.cacheInvalid()//when save to local
             channel?.send(SseEvent("refresh"))
         }
     }
