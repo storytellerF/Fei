@@ -145,6 +145,12 @@
 -dontwarn sun.security.x509.X500Name
 -dontwarn sun.security.x509.X509CertImpl
 -dontwarn sun.security.x509.X509CertInfo
+-dontwarn com.fasterxml.jackson.core.JsonFactory
+-dontwarn com.fasterxml.jackson.core.JsonGenerator$Feature
+-dontwarn com.fasterxml.jackson.core.SerializableString
+-dontwarn com.fasterxml.jackson.core.io.CharacterEscapes
+-dontwarn com.fasterxml.jackson.core.io.SerializedString
+-dontwarn com.fasterxml.jackson.core.json.JsonWriteFeature
 
 # Keep `Companion` object fields of serializable classes.
 # This avoids serializer lookup through `getDeclaredClasses` as done for named companion objects.
