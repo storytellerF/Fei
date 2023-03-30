@@ -19,7 +19,7 @@ import java.nio.file.StandardOpenOption
 val shares = MutableStateFlow<List<SharedFileInfo>>(listOf())
 
 val savedUriFile: MappedByteBuffer by lazy {
-    val file = File("/data/data/com.storyteller_f.fei/files/list.txt")
+    val file = File("/data/data/com.storyteller_f.fei/files/list.txt").ensureFile()
     val channel = FileChannel.open(
         file.toPath(),
         StandardOpenOption.READ,
@@ -27,6 +27,13 @@ val savedUriFile: MappedByteBuffer by lazy {
         StandardOpenOption.CREATE
     )
     channel.map(FileChannel.MapMode.READ_WRITE, 0, 1024)
+}
+
+private fun File.ensureFile(): File {
+    val parentFile = parentFile!!
+    if (!parentFile.exists()) parentFile.mkdir()
+    if (!exists()) createNewFile()
+    return this
 }
 
 fun Context.removeUri(path: SharedFileInfo) {
