@@ -4,6 +4,8 @@ import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothHidDevice
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -363,5 +365,13 @@ object Dvorak : KeyboardInterfaceInterceptor {
                 dvorak[indexOf]
             } else it
         }.joinToString("")
+    }
+}
+
+fun closeBluetoothProfile(
+    bluetoothManager: BluetoothManager, bluetoothHidDevice: BluetoothHidDevice?
+) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        bluetoothManager.adapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, bluetoothHidDevice)
     }
 }

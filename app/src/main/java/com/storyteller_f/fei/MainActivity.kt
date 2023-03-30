@@ -156,6 +156,7 @@ class MainActivity : ComponentActivity() {
                 super.onDestroy(owner)
                 unregisterReceiver(bluetoothStateReceiver)
                 unRegister(this@MainActivity, hidDevice)
+                closeBluetoothProfile(bluetoothManager, hidDevice)
             }
         })
         val connectDevice: (String) -> Boolean = { address ->
