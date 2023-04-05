@@ -1,5 +1,7 @@
 # fei
 
+[![Android CI](https://github.com/storytellerF/Fei/actions/workflows/android.yml/badge.svg)](https://github.com/storytellerF/Fei/actions/workflows/android.yml)
+[![Android Release](https://github.com/storytellerF/Fei/actions/workflows/android-release.yml/badge.svg)](https://github.com/storytellerF/Fei/actions/workflows/android-release.yml)
 ## 榧
 
 使用：
