@@ -40,9 +40,9 @@ import androidx.compose.ui.unit.sp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
-import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.allIp
+import com.storyteller_f.fei.service.FeiService
 import java.util.Collections
 import java.util.stream.IntStream
 
@@ -57,8 +57,10 @@ fun ShowQrCode(
     var selectedIp by remember {
         mutableStateOf(FeiService.defaultAddress)
     }
-    val url by produceState(initialValue = "http://$selectedIp:$port/$sub", sub, selectedIp, port) {
-        value = "http://$selectedIp:$port/$sub"
+    val url by remember {
+        derivedStateOf {
+            "http://$selectedIp:$port/$sub"
+        }
     }
     val image by remember {
         derivedStateOf {

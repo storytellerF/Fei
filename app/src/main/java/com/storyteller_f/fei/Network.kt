@@ -1,10 +1,17 @@
 package com.storyteller_f.fei
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import java.net.NetworkInterface
 
-fun allIp(): List<String> {
+suspend fun allIp(): List<String> {
     val set = mutableSetOf<String>()
-    for (networkInterface in NetworkInterface.getNetworkInterfaces()) {
+    val networkInterfaces = withContext(Dispatchers.IO) {
+        NetworkInterface.getNetworkInterfaces()
+    }
+    for (networkInterface in networkInterfaces) {
+        yield()
         for (interfaceAddress in networkInterface.interfaceAddresses) {
             interfaceAddress.address.hostAddress?.let { set.add(it) }
         }
