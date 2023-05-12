@@ -15,3 +15,20 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Fei"
 include ':app'
+
+def baoFolder = ext.baoFolder
+def home = System.getProperty("user.home")
+def debugBaoFolder
+if (baoFolder == "local")
+    debugBaoFolder = file("$home/AndroidStudioProjects/Bao/")
+else
+    debugBaoFolder = null
+if (debugBaoFolder) {
+    def l = new String[]{
+            "startup", "bao-library"
+    }
+    for (sub in l) {
+        include("bao:$sub")
+        project(":bao:$sub").projectDir = file("${debugBaoFolder.absolutePath}/$sub")
+    }
+}

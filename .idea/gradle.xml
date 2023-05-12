@@ -10,8 +10,11 @@
         <option name="gradleJvm" value="jbr-17" />
         <option name="modules">
           <set>
+            <option value="$PROJECT_DIR$/../Bao/bao-library" />
+            <option value="$PROJECT_DIR$/../Bao/startup" />
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/bao" />
           </set>
         </option>
       </GradleProjectSettings>

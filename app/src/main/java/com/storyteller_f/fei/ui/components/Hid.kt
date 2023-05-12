@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -42,9 +44,11 @@ import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.storyteller_f.fei.HidState
 import com.storyteller_f.fei.MainActivity
 import com.storyteller_f.fei.R
+import kotlinx.coroutines.delay
 import java.util.concurrent.Executors
 
 class ComposeBluetoothDevice(val name: String, val address: String)
@@ -83,7 +87,7 @@ fun BoundDevice(device: ComposeBluetoothDevice, connectDevice: (String) -> Boole
 class HidPreviewProvider : PreviewParameterProvider<HidState> {
     override val values: Sequence<HidState>
         get() = sequenceOf(
-            HidState.BluetoothOff, HidState.NoPermission, HidState.NoBond, HidState.Done(
+            HidState.BluetoothOff, HidState.NoPermission, HidState.NoBond(listOf()), HidState.Done(
                 ComposeBluetoothDevice("name", "address")
             )
         )
@@ -96,7 +100,6 @@ class HidPreviewProvider : PreviewParameterProvider<HidState> {
 fun HidScreen(
     @PreviewParameter(HidPreviewProvider::class) bluetoothState: HidState,
     requestPermission: () -> Unit = {},
-    bondDevices: List<ComposeBluetoothDevice> = listOf(),
     connectDevice: (String) -> Boolean = { false },
     sendText: (String) -> Unit = {},
 ) {
@@ -113,6 +116,11 @@ fun HidScreen(
         .fillMaxWidth()
         .fillMaxHeight()
     when (bluetoothState) {
+        HidState.NotSupport -> {
+            OneCenter {
+                Text(text = "not support")
+            }
+        }
         HidState.BluetoothOff -> {
             OneCenter {
                 Text(text = stringResource(R.string.bluetooth_off_tip))
@@ -130,7 +138,8 @@ fun HidScreen(
 
         }
 
-        HidState.NoBond -> {
+        is HidState.NoBond -> {
+            val bondDevices = bluetoothState.bondDevices
             if (bondDevices.isEmpty()) {
                 Column(
                     modifier = rootModifier,
@@ -161,6 +170,10 @@ fun HidScreen(
                     }
                 }
             }
+            if (bluetoothState.connecting != null)
+            AlertDialog(onDismissRequest = {  }, confirmButton = {  }, text = {
+                Text(text = "connecting to ${bluetoothState.connecting}")
+            })
         }
 
         is HidState.Done -> {
@@ -221,34 +234,67 @@ fun HidScreen(
 }
 
 fun Context.isBonded(device: BluetoothDevice): Boolean {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.BLUETOOTH_CONNECT
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+            device.bondState == BluetoothDevice.BOND_BONDED
+        else {
             return false
         }
-        return device.bondState == BluetoothDevice.BOND_BONDED
+    } else if (ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.BLUETOOTH_ADMIN
+        ) == PackageManager.PERMISSION_GRANTED
+    ) {
+        device.bondState == BluetoothDevice.BOND_BONDED
     } else {
-        //todo 低版本没有bluetooth connect，需要搭配location 使用
-        throw Exception("not implementation")
+        throw Exception("impossible")
     }
 }
 
+fun Context.alreadyBondedDevices(bluetoothManager: BluetoothManager) =
+    when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) == PackageManager.PERMISSION_GRANTED
+            )
+                setOf<BluetoothDevice>(*bluetoothManager.adapter.bondedDevices.toTypedArray())
+            else {
+                setOf()
+            }
+        }
+
+        ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.BLUETOOTH_ADMIN
+        ) == PackageManager.PERMISSION_GRANTED -> {
+            setOf<BluetoothDevice>(*bluetoothManager.adapter.bondedDevices.toTypedArray())
+        }
+
+        else -> setOf()
+    }
+
+
 fun Context.permissionOk(): Boolean {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        return ActivityCompat.checkSelfPermission(
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        ActivityCompat.checkSelfPermission(
             this,
             Manifest.permission.BLUETOOTH_CONNECT
         ) == PackageManager.PERMISSION_GRANTED
     } else {
-        //todo 低版本没有bluetooth connect，需要搭配location 使用
-        throw Exception("not implementation")
+        ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.BLUETOOTH_ADMIN
+        ) == PackageManager.PERMISSION_GRANTED
     }
 }
 
-fun Context.registerApp(
+fun Context.registerAsHid(
     bluetoothHidDevice: BluetoothHidDevice,
     registerCallback: BluetoothHidDevice.Callback
 ) {
@@ -277,61 +323,102 @@ fun Context.registerApp(
     }
 }
 
-fun unRegister(context: Context, hidDevice: BluetoothHidDevice?) {
+fun Context.unRegisterAsHid(hidDevice: BluetoothHidDevice?) {
     hidDevice ?: return
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (ActivityCompat.checkSelfPermission(
-                context,
+                this,
                 Manifest.permission.BLUETOOTH_CONNECT
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+            hidDevice.unregisterApp()
+        else {
             return
         }
-        hidDevice.unregisterApp()
     }
 }
 
-fun sendReport(
-    context: Context,
+suspend fun Context.sendReport(
     hidDevice: BluetoothHidDevice,
     selectedDevice: BluetoothDevice,
-    m: Int,
-    it: Int
+    modification: Int,
+    code: Int
 ) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+    Log.d(
+        "System",
+        "sendReport() called with: hidDevice = $hidDevice, selectedDevice = $selectedDevice, code = $modification, f = $code"
+    )
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         if (ActivityCompat.checkSelfPermission(
-                context,
+                this,
                 Manifest.permission.BLUETOOTH_CONNECT
-            ) != PackageManager.PERMISSION_GRANTED
+            ) == PackageManager.PERMISSION_GRANTED
         ) {
-            return
+            println(hidDevice.sendReport(selectedDevice, 2, byteArrayOf(modification.toByte(), code.toByte())))
+            delay(100)
+            println(hidDevice.sendReport(selectedDevice, 2, byteArrayOf(0, 0)))
+            delay(100)
         }
-        hidDevice.sendReport(selectedDevice, 2, byteArrayOf(m.toByte(), it.toByte()))
-        Thread.sleep(100)
-        hidDevice.sendReport(selectedDevice, 2, byteArrayOf(0, 0))
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.BLUETOOTH_ADMIN
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            hidDevice.sendReport(selectedDevice, 2, byteArrayOf(modification.toByte(), code.toByte()))
+            delay(100)
+            hidDevice.sendReport(selectedDevice, 2, byteArrayOf(0, 0))
+            delay(100)
+        }
+    }
+
+}
+
+fun Context.connectDevice(
+    hidDevice: BluetoothHidDevice?,
+    bondDevices: Set<BluetoothDevice>,
+    address: String
+): Boolean {
+    hidDevice ?: return false
+    val device = bondDevices.firstOrNull {
+        it.address == address
+    } ?: return false
+    return when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) == PackageManager.PERMISSION_GRANTED
+            ) hidDevice.connect(device) else false
+        }
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_ADMIN
+                ) == PackageManager.PERMISSION_GRANTED
+            ) hidDevice.connect(device) else false
+        }
+        else -> false
     }
 }
 
-fun String.toKeyCode(block: (Pair<Int, Int>) -> Unit) {
+inline fun String.toKeyCode(block: (Pair<Int, Int>) -> Unit) {
     keyboardInterceptor.values.fold(this) { s, f ->
         f.intercept(s)
     }.forEach {
         when (it) {
-            in 'a'..'z' -> {
-                block(it - 'a' + 4 to 0)
-            }
+            in 'a'..'z' -> block(it - 'a' + 4 to 0)
 
-            in 'A'..'Z' -> {
-                block(it - 'A' to 2)
-            }
+            in 'A'..'Z' -> block(it - 'A' to 2)
 
-            in '1'..'9' -> {
-                block(it - '1' + 30 to 0)
-            }
+            in '1'..'9' -> block(it - '1' + 30 to 0)
 
             '0' -> block(39 to 0)
             '-' -> block(45 to 0)
             '=' -> block(46 to 0)
+            '[' -> block(47 to 0)
+            ']' -> block(48 to 0)
+            '\\' -> block(49 to 0)
             ':' -> block(51 to 2)
             '.' -> block(55 to 0)
             '/' -> block(56 to 0)

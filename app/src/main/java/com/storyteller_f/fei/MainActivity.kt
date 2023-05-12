@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.*
 import android.content.*
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -26,7 +25,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.datastore.core.DataStore
@@ -48,17 +46,20 @@ import com.storyteller_f.fei.service.portFlow
 import com.storyteller_f.fei.ui.components.*
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.ObsoleteCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.*
 import kotlin.concurrent.thread
 
+
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 sealed class HidState {
+    object NotSupport : HidState()
     object BluetoothOff : HidState()
     object NoPermission : HidState()
-    object NoBond : HidState()
+    class NoBond(val bondDevices: List<ComposeBluetoothDevice>, val connecting: String? = null) : HidState()
     class Done(val device: ComposeBluetoothDevice) : HidState()
 }
 
@@ -70,9 +71,12 @@ class MainActivity : ComponentActivity() {
 
     private var bluetoothPermissionIndex by mutableStateOf(0)
     private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        bluetoothPermissionIndex = bluetoothPermissionIndex.inc()
+        if (it) {
+            bluetoothPermissionIndex = bluetoothPermissionIndex.inc()
+        }
     }
-    var selectedDevice by mutableStateOf<BluetoothDevice?>(null)
+    var connectedDevice by mutableStateOf<BluetoothDevice?>(null)
+    var connecting by mutableStateOf<String?>(null)
 
     @OptIn(
         ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class
@@ -102,7 +106,7 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 request.launch(Manifest.permission.BLUETOOTH_CONNECT)
             } else {
-                request.launch(Manifest.permission.BLUETOOTH)
+                request.launch(Manifest.permission.BLUETOOTH_ADMIN)
             }
         }
         val bluetoothManager = getSystemService(BluetoothManager::class.java)
@@ -115,14 +119,11 @@ class MainActivity : ComponentActivity() {
         }
         var bluetoothState by mutableStateOf(bluetoothManager.adapter.isEnabled)
         var bondDevices by mutableStateOf(
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                ) == PackageManager.PERMISSION_GRANTED
-            ) setOf<BluetoothDevice>(*bluetoothManager.adapter.bondedDevices.toTypedArray()) else setOf()
+            alreadyBondedDevices(bluetoothManager)
         )
         val bluetoothStateReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
+                Log.d(TAG, "onReceive() called with: context = $context, intent = $intent")
                 when (intent?.action) {
                     BluetoothAdapter.ACTION_STATE_CHANGED -> {
                         val intExtra = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, 0)
@@ -141,7 +142,7 @@ class MainActivity : ComponentActivity() {
                             intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                         }
                         if (device != null && isBonded(device)) {
-                            bondDevices = bondDevices + device
+                            bondDevices += device
                         }
                     }
                 }
@@ -155,34 +156,49 @@ class MainActivity : ComponentActivity() {
             override fun onDestroy(owner: LifecycleOwner) {
                 super.onDestroy(owner)
                 unregisterReceiver(bluetoothStateReceiver)
-                unRegister(this@MainActivity, hidDevice)
+                unRegisterAsHid(hidDevice)
                 closeBluetoothProfile(bluetoothManager, hidDevice)
             }
         })
         val connectDevice: (String) -> Boolean = { address ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val result = hidDevice?.connect(bondDevices.firstOrNull {
-                    it.address == address
-                }) ?: false
-                Log.d(TAG, "onCreate: connect $address $result")
-                result
-            } else false
+            connectDevice(hidDevice, bondDevices, address).apply {
+                if (!this) {
+                    Toast.makeText(this@MainActivity, "connect failed", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
-
+        val channel = Channel<String>()
+        lifecycleScope.launch {
+            for (s in channel) {
+                val hid = hidDevice ?: continue
+                val device = connectedDevice ?: continue
+                s.toKeyCode { code ->
+                    this@MainActivity.sendReport(hid, device, code.second, code.first)
+                }
+            }
+        }
         setContent {
+            LaunchedEffect(key1 = bluetoothPermissionIndex) {
+                bondDevices += alreadyBondedDevices(bluetoothManager)
+            }
             val context = LocalContext.current
             val state by produceState<HidState>(
                 initialValue = HidState.BluetoothOff,
                 bluetoothPermissionIndex,
                 bluetoothState,
-                selectedDevice
+                connectedDevice,
+                bondDevices,
+                connecting,
             ) {
-                val local = selectedDevice
+                val connected = connectedDevice
                 value = when {
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.P -> HidState.NotSupport
                     !bluetoothState -> HidState.BluetoothOff
                     !context.permissionOk() -> HidState.NoPermission
-                    local == null -> HidState.NoBond
-                    else -> HidState.Done(local.composeBluetoothDevice())
+                    connected == null -> HidState.NoBond(bondDevices.map {
+                        it.composeBluetoothDevice()
+                    }, connecting)
+                    else -> HidState.Done(connected.composeBluetoothDevice())
                 }
             }
             val port by LocalContext.current.portFlow.collectAsState(initial = FeiService.defaultPort)
@@ -199,10 +215,10 @@ class MainActivity : ComponentActivity() {
 
             val sendText: (String) -> Unit = {
                 val hid = hidDevice
-                val device = selectedDevice
+                val device = connectedDevice
                 if (hid != null && device != null) {
-                    it.toKeyCode { code ->
-                        sendReport(this@MainActivity, hid, device, code.second, code.first)
+                    scope.launch {
+                        channel.send(it)
                     }
                 } else {
                     navController.navigate("hid")
@@ -249,7 +265,10 @@ class MainActivity : ComponentActivity() {
                             FloatingActionButton(onClick = {
                                 pickFile.launch(arrayOf("*/*"))
                             }) {
-                                Icon(Icons.Filled.Add, contentDescription = getString(R.string.add_file))
+                                Icon(
+                                    Icons.Filled.Add,
+                                    contentDescription = getString(R.string.add_file)
+                                )
                             }
                     }, snackbarHost = {
                         SnackbarHost(hostState = snackBarHostState) {
@@ -283,9 +302,7 @@ class MainActivity : ComponentActivity() {
                                     Messages()
                                 }
                                 composable("hid") {
-                                    HidScreen(state, requestPermission, bondDevices.map {
-                                        it.composeBluetoothDevice()
-                                    }, connectDevice, sendText)
+                                    HidScreen(state, requestPermission, connectDevice, sendText)
                                 }
                             }
                         }
@@ -395,7 +412,7 @@ class MainActivity : ComponentActivity() {
                 hidDevice = bluetoothHidDevice
                 if (!hidRegistered) {
                     Log.d(TAG, "onServiceConnected: 没有连接过蓝牙，开始连接")
-                    registerApp(bluetoothHidDevice, registerCallback)
+                    registerAsHid(bluetoothHidDevice, registerCallback)
                 }
             }
         }
@@ -410,16 +427,18 @@ class MainActivity : ComponentActivity() {
     val registerCallback = object : BluetoothHidDevice.Callback() {
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
             super.onAppStatusChanged(pluggedDevice, registered)
+            Log.d(
+                TAG,
+                "onAppStatusChanged() called with: pluggedDevice = $pluggedDevice, registered = $registered"
+            )
             hidRegistered = registered
         }
 
         override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
             super.onConnectionStateChanged(device, state)
-            selectedDevice = if (state == BluetoothProfile.STATE_CONNECTED) {
-                device
-            } else {
-                null
-            }
+            Log.d(TAG, "onConnectionStateChanged() called with: device = $device, state = $state")
+            connectedDevice = if (state == BluetoothProfile.STATE_CONNECTED) device else null
+            connecting = if (state == BluetoothProfile.STATE_CONNECTING) device?.address else null
         }
     }
 
