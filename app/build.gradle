@@ -108,8 +108,8 @@ dependencies {
 
     implementation("androidx.core:core-splashscreen:1.0.1")
     debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.10'
-    def baoFolder = project.ext.baoFolder
 
+    def baoFolder = project.ext.baoFolder
     def baoModule = findProject(":bao:startup")
     if (baoFolder == "local" && baoModule != null)
         implementation(baoModule)

@@ -23,7 +23,7 @@ if (baoFolder == "local")
     debugBaoFolder = file("$home/AndroidStudioProjects/Bao/")
 else
     debugBaoFolder = null
-if (debugBaoFolder) {
+if (debugBaoFolder != null && debugBaoFolder.exists()) {
     def l = new String[]{
             "startup", "bao-library"
     }
