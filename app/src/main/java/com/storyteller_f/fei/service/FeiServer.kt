@@ -4,8 +4,10 @@ import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.core.net.toFile
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.storyteller_f.fei.Message
 import com.storyteller_f.fei.cacheInvalid
+import com.storyteller_f.fei.dataStore
 import com.storyteller_f.fei.removeUri
 import com.storyteller_f.fei.respondUri
 import com.storyteller_f.fei.shares
@@ -25,6 +27,12 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.application.install
+import io.ktor.server.auth.Authentication
+import io.ktor.server.auth.Principal
+import io.ktor.server.auth.UserIdPrincipal
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.form
+import io.ktor.server.auth.session
 import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
@@ -35,9 +43,16 @@ import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondFile
+import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
+import io.ktor.server.sessions.Sessions
+import io.ktor.server.sessions.cookie
+import io.ktor.server.sessions.sessions
+import io.ktor.server.sessions.set
 import io.ktor.server.thymeleaf.Thymeleaf
 import io.ktor.server.thymeleaf.ThymeleafContent
 import io.ktor.server.websocket.pingPeriod
@@ -52,6 +67,8 @@ import kotlinx.coroutines.channels.broadcast
 import kotlinx.coroutines.channels.produce
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -78,7 +95,7 @@ class FeiServer(private val feiService: FeiService) {
         Log.d(TAG, "startInternal() called")
         try {
             server = embeddedServer(Netty, port = port, host = FeiService.listenerAddress) {
-                plugPlugins()
+                plugPlugins(feiService)
                 channel = produce {
                     var n = 0
                     while (true) {
@@ -168,7 +185,7 @@ class FeiServer(private val feiService: FeiService) {
         }
     }
 
-    private fun Application.plugPlugins() {
+    private fun Application.plugPlugins(feiService: FeiService) {
         install(StatusPages) {
             exception<Throwable> { call: ApplicationCall, cause ->
                 call.respondText(
@@ -194,6 +211,34 @@ class FeiServer(private val feiService: FeiService) {
             maxFrameSize = Long.MAX_VALUE
             masking = false
             contentConverter = KotlinxWebsocketSerializationConverter(Json)
+        }
+        install(Authentication) {
+            form {
+                validate { credential ->
+                    val pass = feiService.dataStore.data.map {
+                        it[stringPreferencesKey("pass")]
+                    }.firstOrNull()
+                    if (pass == null || credential.password == pass) {
+                        UserIdPrincipal("pass")
+                    } else null
+                }
+                challenge {
+                    call.respond(HttpStatusCode.Unauthorized, "Credentials are not valid")
+                }
+            }
+            session<UserSession>("auth-session") {
+                validate { session ->
+                    session
+                }
+                challenge {
+                    call.respondRedirect("/login")
+                }
+            }
+        }
+        install(Sessions) {
+            cookie<UserSession>("user_session") {
+                cookie.path = "/"
+            }
         }
     }
 
@@ -253,46 +298,65 @@ class FeiServer(private val feiService: FeiService) {
         private const val TAG = "FeiServer"
     }
 }
+
+data class UserSession(val name: String) : Principal
+
 private fun Application.configureRouting(feiService: FeiService) {
     routing {
-        get("/") {
-            call.respond(
-                ThymeleafContent(
-                    "index",
-                    mapOf("shares" to List(shares.value.size) { index ->
-                        index.toString()
-                    })
-                )
-            )
+        get("/login") {
+            call.respond(ThymeleafContent("login", mapOf()))
         }
-        get("/messages") {
-            call.respond(ThymeleafContent("chat", mapOf()))
-        }
-        get("/shares") {
-            val encodeToString = Json.encodeToString(shares.value)
-            call.respond(encodeToString)
-        }
-
-        get("/shares/{count}") {
-            val index = call.parameters["count"]?.toInt() ?: return@get
-            val info = shares.value.getOrNull(index)
-            if (info == null) {
-                call.respond(HttpStatusCode.NotFound)
-            } else {
-                call.response.header(
-                    HttpHeaders.ContentDisposition,
-                    ContentDisposition.Attachment.withParameter(
-                        ContentDisposition.Parameters.FileName,
-                        info.name
-                    )
-                        .toString()
-                )
-                val file = Uri.parse(info.uri)
-                if (file.scheme == "file") {
-                    call.respondFile(file.toFile())
-                } else call.respondUri(feiService, file)
+        authenticate {
+            post("/login") {
+                call.sessions.set(UserSession(name = UUID.randomUUID().toString()))
+                call.respondRedirect("/")
             }
-
         }
+        authenticate("auth-session") {
+            contentRoute(feiService)
+        }
+
+    }
+}
+
+private fun Route.contentRoute(feiService: FeiService) {
+    get("/") {
+        call.respond(
+            ThymeleafContent(
+                "index",
+                mapOf("shares" to List(shares.value.size) { index ->
+                    index.toString()
+                })
+            )
+        )
+    }
+    get("/messages") {
+        call.respond(ThymeleafContent("chat", mapOf()))
+    }
+    get("/shares") {
+        val encodeToString = Json.encodeToString(shares.value)
+        call.respond(encodeToString)
+    }
+
+    get("/shares/{count}") {
+        val index = call.parameters["count"]?.toInt() ?: return@get
+        val info = shares.value.getOrNull(index)
+        if (info == null) {
+            call.respond(HttpStatusCode.NotFound)
+        } else {
+            call.response.header(
+                HttpHeaders.ContentDisposition,
+                ContentDisposition.Attachment.withParameter(
+                    ContentDisposition.Parameters.FileName,
+                    info.name
+                )
+                    .toString()
+            )
+            val file = Uri.parse(info.uri)
+            if (file.scheme == "file") {
+                call.respondFile(file.toFile())
+            } else call.respondUri(feiService, file)
+        }
+
     }
 }

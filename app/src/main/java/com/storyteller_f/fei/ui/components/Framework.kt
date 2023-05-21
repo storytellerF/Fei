@@ -37,9 +37,9 @@ import com.storyteller_f.fei.service.FeiService
 
 @Preview
 @Composable
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 fun FeiMainToolbar(
-    port: String = "8080",
+    port: String = FeiService.defaultPort.toString(),
     restartService: () -> Unit = {},
     stopService: () -> Unit = {},
     sendText: (String) -> Unit = {},
@@ -95,9 +95,12 @@ fun FeiMainToolbar(
             IconButton(onClick = {
                 deleteAll()
             }) {
-                Icon(ImageVector.vectorResource(id = R.drawable.baseline_delete_24), contentDescription = stringResource(
-                                    R.string.delete_all)
-                                )
+                Icon(
+                    ImageVector.vectorResource(id = R.drawable.baseline_delete_24),
+                    contentDescription = stringResource(
+                        R.string.delete_all
+                    )
+                )
             }
         },
 
@@ -127,7 +130,7 @@ fun FeiMainToolbar(
 @Preview
 @Composable
 @OptIn(ExperimentalComposeUiApi::class)
-fun SettingPage(port: String = "8080") {
+fun SettingPage(port: String = FeiService.defaultPort.toString()) {
     PrefsScreen(dataStore = LocalContext.current.dataStore) {
         prefsItem {
             EditTextPref(
@@ -145,7 +148,11 @@ fun SettingPage(port: String = "8080") {
 @Preview
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun NavDrawer(closeDrawer: () -> Unit = {}, navigateTo: (String) -> Unit = {}, openAboutPage: () -> Unit = {}) {
+fun NavDrawer(
+    closeDrawer: () -> Unit = {},
+    navigateTo: (String) -> Unit = {},
+    openAboutPage: () -> Unit = {}
+) {
 
     NavigationDrawerItem(
         label = {
@@ -175,6 +182,16 @@ fun NavDrawer(closeDrawer: () -> Unit = {}, navigateTo: (String) -> Unit = {}, o
             closeDrawer()
         })
     }
+
+    NavigationDrawerItem(label = { Text(text = "保护措施") }, icon = {
+        Icon(
+            ImageVector.vectorResource(R.drawable.baseline_password_24),
+            contentDescription = "safe"
+        )
+    }, selected = false, onClick = {
+        navigateTo("safe")
+        closeDrawer()
+    })
 
     NavigationDrawerItem(
         label = {
@@ -207,7 +224,9 @@ fun NavDrawer(closeDrawer: () -> Unit = {}, navigateTo: (String) -> Unit = {}, o
 
 @Composable
 fun OneCenter(content: @Composable BoxScope.() -> Unit) {
-    Box(modifier = Modifier
-        .fillMaxWidth()
-        .fillMaxHeight(), contentAlignment = Alignment.Center, content = content)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(), contentAlignment = Alignment.Center, content = content
+    )
 }
