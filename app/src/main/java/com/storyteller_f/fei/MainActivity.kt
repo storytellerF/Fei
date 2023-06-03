@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -36,8 +35,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.jamal.composeprefs3.ui.PrefsScreen
-import com.jamal.composeprefs3.ui.prefs.EditTextPref
 import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.service.SharedFileInfo
 import com.storyteller_f.fei.service.SseEvent
@@ -232,16 +229,6 @@ class MainActivity : ComponentActivity() {
         startService(intent)
         if (fei == null) bindService(intent, connection, 0)
         CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
-    }
-
-    @OptIn(ExperimentalComposeUiApi::class)
-    @Composable
-    private fun SafePage() {
-        PrefsScreen(dataStore = LocalContext.current.dataStore) {
-            prefsItem {
-                EditTextPref(key = "pass", title = "pass")
-            }
-        }
     }
 
     override fun onDestroy() {
