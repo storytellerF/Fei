@@ -39,7 +39,7 @@ android {
         compose true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion '1.4.3'
+        kotlinCompilerExtensionVersion '1.4.7'
     }
     packagingOptions {
         resources {
@@ -53,17 +53,19 @@ android {
 }
 
 dependencies {
-    def compose_material3 = "1.0.1"
+    def compose_material3 = "1.1.0"
 
-    implementation 'androidx.core:core-ktx:1.10.0'
+    implementation 'androidx.core:core-ktx:1.10.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
-    implementation 'androidx.activity:activity-compose:1.7.1'
+    implementation 'androidx.activity:activity-compose:1.7.2'
+
     implementation "androidx.compose.ui:ui:$compose_version"
     implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
-    implementation "androidx.compose.material3:material3:$compose_material3"
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
     debugImplementation "androidx.compose.ui:ui-tooling:$compose_version"
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
+
+    implementation "androidx.compose.material3:material3:$compose_material3"
     debugImplementation "androidx.customview:customview:1.1.0"
     debugImplementation "androidx.customview:customview-poolingcontainer:1.0.0"
 
@@ -105,7 +107,7 @@ dependencies {
     implementation "com.github.JamalMulla:ComposePrefs3:1.0.3" // Current is 1.0.3
     implementation "androidx.datastore:datastore-preferences:1.0.0"
 
-    implementation('androidx.webkit:webkit:1.6.1')
+    implementation('androidx.webkit:webkit:1.7.0')
     implementation("androidx.browser:browser:1.5.0")
 
     implementation("androidx.core:core-splashscreen:1.0.1")
@@ -116,5 +118,5 @@ dependencies {
     if (baoFolder == "local" && baoModule != null)
         implementation(baoModule)
     else
-        implementation("com.github.storytellerF.Bao:startup:2.2.0")
+        implementation("com.github.storytellerF.Bao:startup:2.3.0")
 }

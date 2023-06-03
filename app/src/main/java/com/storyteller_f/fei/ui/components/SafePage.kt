@@ -13,7 +13,7 @@ import com.storyteller_f.fei.dataStore
 fun SafePage() {
     PrefsScreen(dataStore = LocalContext.current.dataStore) {
         prefsItem {
-            EditTextPref(key = "pass", title = "pass")
+            EditTextPref(key = "password", title = "password", summary = "想要访问内容必需输入此密码，为空代表不需要密码")
         }
     }
 }
