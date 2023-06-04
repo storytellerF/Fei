@@ -73,7 +73,7 @@ class NoOpBluetoothFei : BluetoothFeiService {
 @RequiresApi(Build.VERSION_CODES.P)
 class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
     val bluetoothManager: BluetoothManager = context.getSystemService(BluetoothManager::class.java)
-    var bluetoothState by mutableStateOf(bluetoothManager.adapter.isEnabled)
+    var bluetoothState by mutableStateOf(bluetoothManager.adapter?.isEnabled ?: false)
     var bondDevices by mutableStateOf(
         context.alreadyBondedDevices(bluetoothManager)
     )
@@ -84,7 +84,7 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
     var connecting by mutableStateOf<String?>(null)
 
     override fun start() {
-        bluetoothManager.adapter.getProfileProxy(
+        bluetoothManager.adapter?.getProfileProxy(
             context,
             bluetoothConnection,
             BluetoothProfile.HID_DEVICE

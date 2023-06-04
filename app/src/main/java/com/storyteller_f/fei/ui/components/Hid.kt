@@ -263,7 +263,7 @@ fun Context.alreadyBondedDevices(bluetoothManager: BluetoothManager) =
                     Manifest.permission.BLUETOOTH_CONNECT
                 ) == PackageManager.PERMISSION_GRANTED
             )
-                setOf<BluetoothDevice>(*bluetoothManager.adapter.bondedDevices.toTypedArray())
+                setOf<BluetoothDevice>(*bluetoothManager.adapter?.bondedDevices.orEmpty().toTypedArray())
             else {
                 setOf()
             }
@@ -273,7 +273,7 @@ fun Context.alreadyBondedDevices(bluetoothManager: BluetoothManager) =
             this,
             Manifest.permission.BLUETOOTH_ADMIN
         ) == PackageManager.PERMISSION_GRANTED -> {
-            setOf<BluetoothDevice>(*bluetoothManager.adapter.bondedDevices.toTypedArray())
+            setOf<BluetoothDevice>(*bluetoothManager.adapter?.bondedDevices.orEmpty().toTypedArray())
         }
 
         else -> setOf()
