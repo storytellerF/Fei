@@ -151,6 +151,7 @@
 -dontwarn com.fasterxml.jackson.core.io.CharacterEscapes
 -dontwarn com.fasterxml.jackson.core.io.SerializedString
 -dontwarn com.fasterxml.jackson.core.json.JsonWriteFeature
+-dontwarn org.jetbrains.annotations.VisibleForTesting
 
 # Keep `Companion` object fields of serializable classes.
 # This avoids serializer lookup through `getDeclaredClasses` as done for named companion objects.
