@@ -23,7 +23,7 @@ import com.storyteller_f.fei.R
 
 class MessagesProvider : PreviewParameterProvider<Message> {
     override val values: Sequence<Message>
-        get() = sequenceOf(Message("system", "hello"))
+        get() = sequenceOf(Message("system", "hello"), Message("user0", "world"))
 
 }
 
@@ -35,7 +35,7 @@ fun MessageItem(@PreviewParameter(MessagesProvider::class) item: Message) {
     val context = LocalContext.current
     Row(modifier = Modifier.clickable {
         expanded = true
-    }.padding(bottom = 8.dp)) {
+    }.padding(bottom = 8.dp).fillMaxWidth()) {
         Box(
             modifier = Modifier
                 .width(30.dp)
@@ -48,13 +48,13 @@ fun MessageItem(@PreviewParameter(MessagesProvider::class) item: Message) {
             Text(text = item.from)
             Text(text = item.data)
         }
-    }
-    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-        DropdownMenuItem(text = { Text(text = stringResource(id = android.R.string.copy)) }, onClick = {
-            clipboardManager.setText(AnnotatedString(item.data))
-            Toast.makeText(context, context.getString(R.string.copied), Toast.LENGTH_SHORT).show()
-            expanded = false
-        })
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(text = { Text(text = stringResource(id = android.R.string.copy)) }, onClick = {
+                clipboardManager.setText(AnnotatedString(item.data))
+                Toast.makeText(context, context.getString(R.string.copied), Toast.LENGTH_SHORT).show()
+                expanded = false
+            })
+        }
     }
 }
 
