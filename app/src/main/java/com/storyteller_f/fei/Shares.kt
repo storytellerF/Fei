@@ -94,7 +94,22 @@ suspend fun Context.cacheInvalid() = withContext(Dispatchers.IO) {
     }
 }
 
-private fun Context.cacheInvalidInternal(): Boolean {
+private suspend fun Context.cacheInvalidInternal(): Boolean {
+    val savedList = savedList()
+    val savedFiles = savedFiles()
+    return shares.tryEmit(savedFiles + savedList)
+}
+
+private suspend fun Context.savedFiles(): List<SharedFileInfo> = withContext(Dispatchers.IO) {
+    val savedFiles = File(filesDir, "saved").listFiles()?.let {
+        it.map { file ->
+            SharedFileInfo(file.toUri().toString(), file.name)
+        }
+    }.orEmpty()
+    savedFiles
+}
+
+private suspend fun Context.savedList(): List<SharedFileInfo> = withContext(Dispatchers.IO) {
     val buffer = savedUriFile
     val content = buffer.readText()
     val savedList = content.split("\n").filter {
@@ -105,12 +120,7 @@ private fun Context.cacheInvalidInternal(): Boolean {
     buffer.writeText(savedList.joinToString("\n") {
         it.uri
     })
-    val savedFiles = File(filesDir, "saved").listFiles()?.let {
-        it.map { file ->
-            SharedFileInfo(file.toUri().toString(), file.name)
-        }
-    }.orEmpty()
-    return shares.tryEmit(savedFiles + savedList)
+    savedList
 }
 
 private fun Context.sharedFileInfo(it: String) = try {
