@@ -90,8 +90,6 @@ class FeiService : Service() {
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentTitle(getString(R.string.app_name)).setContentText(message).build()
             startForeground(foreground_notification_id, notification)
-        } else {
-//            Toast.makeText(this, "未开启通知", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -105,6 +103,10 @@ class FeiService : Service() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         server.stopAsync()
         scope.cancel()
+    }
+
+    fun onUserGrantNotificationPermission() {
+        postNotify("已同意权限")
     }
 
     class Fei(val feiService: FeiService) : Binder() {

@@ -3,6 +3,7 @@ package com.storyteller_f.fei
 import android.Manifest
 import android.bluetooth.*
 import android.content.*
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -29,12 +30,18 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
 import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.service.SharedFileInfo
 import com.storyteller_f.fei.service.SseEvent
@@ -81,7 +88,8 @@ class MainActivity : ComponentActivity() {
 
 
     @OptIn(
-        ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class
+        ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class,
+        ExperimentalPermissionsApi::class
     )
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -111,6 +119,13 @@ class MainActivity : ComponentActivity() {
                 request.launch(Manifest.permission.BLUETOOTH_ADMIN)
             }
         }
+        val requestNotificationPermission = registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { isGranted: Boolean ->
+            if (isGranted) {
+                fei?.feiService?.onUserGrantNotificationPermission()
+            }
+        }
 
         setContent {
             val state by bf.state()
@@ -133,8 +148,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+            val showAboutWebView = {
+                val builder = CustomTabsIntent.Builder()
+                    .setInitialActivityHeightPx((screenHeight * 0.7).toInt())
+                val session = newSession
+                if (session != null) builder.setSession(session)
+                val customTabsIntent = builder.build()
+                customTabsIntent.launchUrl(current, Uri.parse(projectUrl))
+            }
             FeiTheme {
                 ModalNavigationDrawer(drawerContent = {
+
                     ModalDrawerSheet {
                         Spacer(Modifier.height(12.dp))
                         NavDrawer({
@@ -143,14 +167,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }, {
                             navController.navigate(it)
-                        }, {
-                            val builder = CustomTabsIntent.Builder()
-                                .setInitialActivityHeightPx((screenHeight * 0.7).toInt())
-                            val session = newSession
-                            if (session != null) builder.setSession(session)
-                            val customTabsIntent = builder.build()
-                            customTabsIntent.launchUrl(current, Uri.parse(projectUrl))
-                        })
+                        }, showAboutWebView)
                     }
                 }, drawerState = drawerState) {
                     Scaffold(topBar = {
@@ -192,36 +209,47 @@ class MainActivity : ComponentActivity() {
                             color = MaterialTheme.colorScheme.background
                         ) {
                             NavHost(navController = navController, startDestination = "main") {
-                                composable("main") {
-                                    Main(infoList, deleteItem, saveToLocal) {
-                                        val i = shares.value.indexOf(it)
-                                        navController.navigate("info/$i")
-                                    }
-                                }
-                                composable("info/{index}", arguments = listOf(navArgument("index") {
-                                    type = NavType.IntType
-                                })) {
-                                    val i = it.arguments?.getInt("index")
-                                    Info(i ?: 0, port.toString(), sendText)
-                                }
-                                composable("settings") {
-                                    SettingPage(port.toString())
-                                }
-                                composable("messages") {
-                                    Messages()
-                                }
-                                composable("hid") {
-                                    HidScreen(state, requestPermission, {
-                                        bf.connectDevice(it)
-                                    }, sendText)
-                                }
-                                composable("safe") {
-                                    SafePage()
-                                }
+                                navPages(
+                                    infoList,
+                                    deleteItem,
+                                    saveToLocal,
+                                    navController,
+                                    port,
+                                    sendText,
+                                    state,
+                                    requestPermission
+                                )
                             }
                         }
                     }
                 }
+                //check permission
+                var showRationaleDialog by remember {
+                    mutableStateOf(false)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    val postNotificationPermission =
+                        rememberPermissionState(permission = Manifest.permission.POST_NOTIFICATIONS)
+                    LaunchedEffect(key1 = postNotificationPermission) {
+                        if (!postNotificationPermission.status.isGranted) {
+                            if (postNotificationPermission.status.shouldShowRationale) {
+                                showRationaleDialog = true
+                            } else
+                                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                    if (showRationaleDialog) {
+                        AlertDialog(onDismissRequest = {
+                            showRationaleDialog = false
+                        }, confirmButton = {
+                            showRationaleDialog = false
+                            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }, text = {
+                            Text(text = "为了能够保证在后台正常运行，需要”Post Notification“ 权限")
+                        })
+                    }
+                }
+
 
             }
         }
@@ -229,6 +257,45 @@ class MainActivity : ComponentActivity() {
         startService(intent)
         if (fei == null) bindService(intent, connection, 0)
         CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
+
+    }
+
+    private fun NavGraphBuilder.navPages(
+        infoList: List<SharedFileInfo>,
+        deleteItem: (SharedFileInfo) -> Unit,
+        saveToLocal: (SharedFileInfo) -> Unit,
+        navController: NavHostController,
+        port: Int,
+        sendText: (String) -> Unit,
+        state: HidState,
+        requestPermission: () -> Unit
+    ) {
+        composable("main") {
+            Main(infoList, deleteItem, saveToLocal) {
+                val i = shares.value.indexOf(it)
+                navController.navigate("info/$i")
+            }
+        }
+        composable("info/{index}", arguments = listOf(navArgument("index") {
+            type = NavType.IntType
+        })) {
+            val i = it.arguments?.getInt("index")
+            Info(i ?: 0, port.toString(), sendText)
+        }
+        composable("settings") {
+            SettingPage(port.toString())
+        }
+        composable("messages") {
+            Messages()
+        }
+        composable("hid") {
+            HidScreen(state, requestPermission, {
+                bf.connectDevice(it)
+            }, sendText)
+        }
+        composable("safe") {
+            SafePage()
+        }
     }
 
     override fun onDestroy() {

@@ -55,7 +55,7 @@ android {
 
 dependencies {
     def compose_material3 = "1.0.1"
-    def nav_version = "2.5.3"
+    def nav_version = "2.6.0"
     def ktor_version = '2.3.1'
 
     implementation 'androidx.core:core-ktx:1.10.1'
@@ -73,6 +73,7 @@ dependencies {
     debugImplementation "androidx.customview:customview-poolingcontainer:1.0.0"
 
     implementation 'com.google.accompanist:accompanist-systemuicontroller:0.30.0'
+    implementation "com.google.accompanist:accompanist-permissions:0.30.0"
 
     implementation "androidx.navigation:navigation-compose:$nav_version"
 
