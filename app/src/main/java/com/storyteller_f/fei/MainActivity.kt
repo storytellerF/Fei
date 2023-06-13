@@ -3,7 +3,6 @@ package com.storyteller_f.fei
 import android.Manifest
 import android.bluetooth.*
 import android.content.*
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -85,47 +84,22 @@ class MainActivity : ComponentActivity() {
             NoOpBluetoothFei()
         }
     }
-
+    private val requestNotificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            fei?.feiService?.onUserGrantNotificationPermission()
+        }
+    }
 
     @OptIn(
-        ExperimentalMaterial3Api::class, ObsoleteCoroutinesApi::class,
+        ExperimentalMaterial3Api::class,
         ExperimentalPermissionsApi::class
     )
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        val deleteItem: (SharedFileInfo) -> Unit = { path ->
-            val uri = Uri.parse(path.uri)
-            lifecycleScope.launch {
-                if (uri.scheme == "file") {
-                    uri.path?.let { File(it).delete() }
-                } else {
-                    removeUri(path)
-                }
-                cacheInvalid()//when delete
-                fei?.feiService?.server?.channel?.trySend(SseEvent(data = "refresh"))
-            }
-        }
-        val saveToLocal: (SharedFileInfo) -> Unit = {
-            val uri = Uri.parse(it.uri)
-            assert(uri.scheme != "file")
-            fei?.saveToLocal(uri, it)
-        }
-        val requestPermission: () -> Unit = {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                request.launch(Manifest.permission.BLUETOOTH_CONNECT)
-            } else {
-                request.launch(Manifest.permission.BLUETOOTH_ADMIN)
-            }
-        }
-        val requestNotificationPermission = registerForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) { isGranted: Boolean ->
-            if (isGranted) {
-                fei?.feiService?.onUserGrantNotificationPermission()
-            }
-        }
 
         setContent {
             val state by bf.state()
@@ -182,7 +156,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             {
-                                shares.value.forEach(deleteItem)
+                                shares.value.forEach(::deleteItem)
                             }
                         )
                     }, floatingActionButton = {
@@ -211,13 +185,13 @@ class MainActivity : ComponentActivity() {
                             NavHost(navController = navController, startDestination = "main") {
                                 navPages(
                                     infoList,
-                                    deleteItem,
-                                    saveToLocal,
+                                    ::deleteItem,
+                                    ::saveToLocal,
                                     navController,
                                     port,
                                     sendText,
                                     state,
-                                    requestPermission
+                                    ::requestPermission
                                 )
                             }
                         }
@@ -258,6 +232,34 @@ class MainActivity : ComponentActivity() {
         if (fei == null) bindService(intent, connection, 0)
         CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
 
+    }
+
+    private fun requestPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            request.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            request.launch(Manifest.permission.BLUETOOTH_ADMIN)
+        }
+    }
+
+    private fun saveToLocal(it: SharedFileInfo) {
+        val uri = Uri.parse(it.uri)
+        assert(uri.scheme != "file")
+        fei?.saveToLocal(uri, it)
+    }
+
+    @OptIn(ObsoleteCoroutinesApi::class)
+    private fun deleteItem(path: SharedFileInfo) {
+        val uri = Uri.parse(path.uri)
+        lifecycleScope.launch {
+            if (uri.scheme == "file") {
+                uri.path?.let { File(it).delete() }
+            } else {
+                removeUri(path)
+            }
+            cacheInvalid()//when delete
+            fei?.feiService?.server?.channel?.trySend(SseEvent(data = "refresh"))
+        }
     }
 
     private fun NavGraphBuilder.navPages(
