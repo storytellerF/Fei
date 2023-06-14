@@ -54,7 +54,7 @@ android {
 }
 
 dependencies {
-    def compose_material3 = "1.0.1"
+    def compose_material3 = "1.1.0"
     def nav_version = "2.6.0"
     def ktor_version = '2.3.1'
 
@@ -108,7 +108,7 @@ dependencies {
     implementation 'org.slf4j:slf4j-android:1.7.36'
     implementation 'com.google.zxing:core:3.5.1'
 
-    implementation "com.github.JamalMulla:ComposePrefs3:1.0.3" // Current is 1.0.3
+    implementation "com.github.JamalMulla:ComposePrefs3:1.0.4" // Current is 1.0.3
     implementation "androidx.datastore:datastore-preferences:1.0.0"
 
     implementation('androidx.webkit:webkit:1.7.0')
