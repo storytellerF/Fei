@@ -14,12 +14,14 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.browser.customtabs.CustomTabsCallback
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.browser.customtabs.CustomTabsServiceConnection
 import androidx.browser.customtabs.CustomTabsSession
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -27,8 +29,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -60,6 +62,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -87,6 +90,7 @@ import com.storyteller_f.fei.ui.components.SettingPage
 import com.storyteller_f.fei.ui.components.SharedFile
 import com.storyteller_f.fei.ui.components.ShowQrCode
 import com.storyteller_f.fei.ui.theme.FeiTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.launch
 import java.io.File
@@ -131,7 +135,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -166,100 +169,25 @@ class MainActivity : ComponentActivity() {
                 val customTabsIntent = builder.build()
                 customTabsIntent.launchUrl(current, Uri.parse(projectUrl))
             }
+
             FeiTheme {
                 ModalNavigationDrawer(drawerContent = {
-
-                    ModalDrawerSheet {
-                        Spacer(Modifier.height(12.dp))
-                        NavDrawer({
-                            scope.launch {
-                                drawerState.close()
-                            }
-                        }, {
-                            navController.navigate(it)
-                        }, showAboutWebView)
-                    }
+                    Drawer(scope, drawerState, navController, showAboutWebView)
                 }, drawerState = drawerState) {
                     Scaffold(topBar = {
-                        FeiMainToolbar(
-                            port.toString(),
-                            { fei?.restart() },
-                            { fei?.stop() },
-                            sendText,
-                            {
-                                scope.launch {
-                                    drawerState.open()
-                                }
-                            },
-                            {
-                                shares.value.forEach(::deleteItem)
-                            }
-                        )
+                        TopBar(port, sendText, scope, drawerState)
                     }, floatingActionButton = {
-                        val text = currentBackStackEntryAsState?.destination?.route.orEmpty()
-                        if (text != "messages")
-                            FloatingActionButton(onClick = {
-                                pickFile.launch(arrayOf("*/*"))
-                            }) {
-                                Icon(
-                                    Icons.Filled.Add,
-                                    contentDescription = getString(R.string.add_file)
-                                )
-                            }
+                        Floating(currentBackStackEntryAsState)
                     }, snackbarHost = {
-                        SnackbarHost(hostState = snackBarHostState) {
-
-                        }
+                        SnackbarHost(hostState = snackBarHostState) { }
                     }) { paddingValues ->
-                        // A surface container using the 'background' color from the theme
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(paddingValues),
-                            color = MaterialTheme.colorScheme.background
-                        ) {
-                            NavHost(navController = navController, startDestination = "main") {
-                                navPages(
-                                    infoList,
-                                    ::deleteItem,
-                                    ::saveToLocal,
-                                    navController,
-                                    port,
-                                    sendText,
-                                    state,
-                                    ::requestPermission
-                                )
-                            }
-                        }
-                    }
-                }
-                //check permission
-                var showRationaleDialog by remember {
-                    mutableStateOf(false)
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    val postNotificationPermission =
-                        rememberPermissionState(permission = Manifest.permission.POST_NOTIFICATIONS)
-                    LaunchedEffect(key1 = postNotificationPermission) {
-                        if (!postNotificationPermission.status.isGranted) {
-                            if (postNotificationPermission.status.shouldShowRationale) {
-                                showRationaleDialog = true
-                            } else
-                                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                    }
-                    if (showRationaleDialog) {
-                        AlertDialog(onDismissRequest = {
-                            showRationaleDialog = false
-                        }, confirmButton = {
-                            showRationaleDialog = false
-                            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        }, text = {
-                            Text(text = "为了能够保证在后台正常运行，需要”Post Notification“ 权限")
-                        })
+                        MainContent(paddingValues, navController, infoList, port, sendText, state)
                     }
                 }
 
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    NotificationRequest()
+                }
 
             }
         }
@@ -268,6 +196,121 @@ class MainActivity : ComponentActivity() {
         if (fei == null) bindService(intent, connection, 0)
         CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
 
+    }
+
+    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    @Composable
+    @OptIn(ExperimentalPermissionsApi::class)
+    private fun NotificationRequest() {
+        var showRationaleDialog by remember {
+            mutableStateOf(false)
+        }
+        val postNotificationPermission =
+            rememberPermissionState(permission = Manifest.permission.POST_NOTIFICATIONS)
+        LaunchedEffect(key1 = postNotificationPermission) {
+            if (!postNotificationPermission.status.isGranted) {
+                if (postNotificationPermission.status.shouldShowRationale) {
+                    showRationaleDialog = true
+                } else
+                    requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        if (showRationaleDialog) {
+            AlertDialog(onDismissRequest = {
+                showRationaleDialog = false
+            }, confirmButton = {
+                showRationaleDialog = false
+                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }, text = {
+                Text(text = "为了能够保证在后台正常运行，需要”Post Notification“ 权限")
+            })
+        }
+    }
+
+    @Composable
+    private fun MainContent(
+        paddingValues: PaddingValues,
+        navController: NavHostController,
+        infoList: List<SharedFileInfo>,
+        port: Int,
+        sendText: (String) -> Unit,
+        state: HidState
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            NavHost(navController = navController, startDestination = "main") {
+                navPages(
+                    infoList,
+                    ::deleteItem,
+                    ::saveToLocal,
+                    navController,
+                    port,
+                    sendText,
+                    state,
+                    ::requestPermission
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun Floating(currentBackStackEntryAsState: NavBackStackEntry?) {
+        val text = currentBackStackEntryAsState?.destination?.route.orEmpty()
+        if (text != "messages")
+            FloatingActionButton(onClick = {
+                pickFile.launch(arrayOf("*/*"))
+            }) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = getString(R.string.add_file)
+                )
+            }
+    }
+
+    @Composable
+    private fun Drawer(
+        scope: CoroutineScope,
+        drawerState: DrawerState,
+        navController: NavHostController,
+        showAboutWebView: () -> Unit
+    ) {
+        ModalDrawerSheet {
+            Spacer(Modifier.height(12.dp))
+            NavDrawer({
+                scope.launch {
+                    drawerState.close()
+                }
+            }, {
+                navController.navigate(it)
+            }, showAboutWebView)
+        }
+    }
+
+    @Composable
+    private fun TopBar(
+        port: Int,
+        sendText: (String) -> Unit,
+        scope: CoroutineScope,
+        drawerState: DrawerState
+    ) {
+        FeiMainToolbar(
+            port.toString(),
+            { fei?.restart() },
+            { fei?.stop() },
+            sendText,
+            {
+                scope.launch {
+                    drawerState.open()
+                }
+            },
+            {
+                shares.value.forEach(::deleteItem)
+            }
+        )
     }
 
     private fun requestPermission() {

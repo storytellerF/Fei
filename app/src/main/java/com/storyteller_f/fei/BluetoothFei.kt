@@ -25,15 +25,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.storyteller_f.fei.ui.components.ComposeBluetoothDevice
-import com.storyteller_f.fei.ui.components.alreadyBondedDevices
-import com.storyteller_f.fei.ui.components.closeBluetoothProfile
-import com.storyteller_f.fei.ui.components.connectDevice
-import com.storyteller_f.fei.ui.components.isBonded
-import com.storyteller_f.fei.ui.components.permissionOk
-import com.storyteller_f.fei.ui.components.registerAsHid
-import com.storyteller_f.fei.ui.components.sendReport
-import com.storyteller_f.fei.ui.components.toKeyCode
-import com.storyteller_f.fei.ui.components.unRegisterAsHid
+
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 
@@ -73,7 +65,8 @@ class NoOpBluetoothFei : BluetoothFeiService {
 @RequiresApi(Build.VERSION_CODES.P)
 class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
     val bluetoothManager: BluetoothManager = context.getSystemService(BluetoothManager::class.java)
-    var bluetoothState by mutableStateOf(bluetoothManager.adapter?.isEnabled ?: false)
+    private val adapter = bluetoothManager.adapter
+    var bluetoothState by mutableStateOf(adapter?.isEnabled ?: false)
     var bondDevices by mutableStateOf(
         context.alreadyBondedDevices(bluetoothManager)
     )
@@ -84,7 +77,7 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
     var connecting by mutableStateOf<String?>(null)
 
     override fun start() {
-        bluetoothManager.adapter?.getProfileProxy(
+        adapter?.getProfileProxy(
             context,
             bluetoothConnection,
             BluetoothProfile.HID_DEVICE
@@ -125,7 +118,7 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
                 super.onDestroy(owner)
                 context.unregisterReceiver(bluetoothStateReceiver)
                 context.unRegisterAsHid(hidDevice)
-                closeBluetoothProfile(bluetoothManager, hidDevice)
+                bluetoothManager.closeBluetoothProfile(hidDevice)
             }
         })
         context.lifecycleScope.launch {
