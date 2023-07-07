@@ -34,6 +34,8 @@ interface BluetoothFeiService {
 
     fun connectDevice(address: String): Boolean
 
+    fun disconnectDevice(address: String): Boolean
+
     suspend fun sendText(content: String): Boolean
 
     fun start()
@@ -47,6 +49,7 @@ class NoOpBluetoothFei : BluetoothFeiService {
     override fun refreshBondDevices() = Unit
 
     override fun connectDevice(address: String) = false
+    override fun disconnectDevice(address: String) = false
 
     override suspend fun sendText(content: String) = false
     override fun start() = Unit
@@ -182,10 +185,15 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
 
     override fun connectDevice(address: String): Boolean {
         return context.connectDevice(hidDevice, bondDevices, address).apply {
-            if (!this) {
-                Toast.makeText(context, "connect failed", Toast.LENGTH_SHORT).show()
-            }
+            if (!this) showShortToast()
         }
+    }
+
+    private fun showShortToast() =
+        Toast.makeText(context, "connect failed", Toast.LENGTH_SHORT).show()
+
+    override fun disconnectDevice(address: String): Boolean {
+        return context.disconnectDevice(hidDevice, bondDevices, address)
     }
 
     override suspend fun sendText(content: String): Boolean {

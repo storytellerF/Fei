@@ -88,6 +88,7 @@ fun HidScreen(
     requestPermission: () -> Unit = {},
     connectDevice: (String) -> Boolean = { false },
     sendText: (String) -> Unit = {},
+    disconnect: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val toBluetoothSettings = {
@@ -110,7 +111,9 @@ fun HidScreen(
             connectDevice
         )
 
-        is HidState.Done -> ConnectedPage(rootModifier, bluetoothState, sendText)
+        is HidState.Done -> ConnectedPage(rootModifier, bluetoothState, sendText) {
+            disconnect(bluetoothState.device.address)
+        }
     }
 }
 
@@ -144,6 +147,7 @@ private fun ConnectedPage(
     modifier: Modifier,
     bluetoothState: HidState.Done,
     sendText: (String) -> Unit,
+    disconnect: () -> Unit,
 ) {
     var content by remember {
         mutableStateOf("")
@@ -155,6 +159,11 @@ private fun ConnectedPage(
                 bluetoothState.device.name
             ), style = MaterialTheme.typography.titleMedium
         )
+        Button(onClick = {
+            disconnect()
+        }) {
+            Text(text = "断开连接")
+        }
         Text(text = stringResource(R.string.test_case))
         Row {
             Button(onClick = {
@@ -192,7 +201,12 @@ private fun ConnectedPage(
                     Button(onClick = {
                         keyboardInterceptor.putIfAbsent(KeyboardInterfaceInterceptor.key, it)
                     }) {
-                        Text(text = stringResource(R.string.plug_dvorak_keyboard_style, it.javaClass.simpleName))
+                        Text(
+                            text = stringResource(
+                                R.string.plug_dvorak_keyboard_style,
+                                it.javaClass.simpleName
+                            )
+                        )
                     }
                 }
             }
@@ -200,7 +214,12 @@ private fun ConnectedPage(
             Button(onClick = {
                 keyboardInterceptor.remove(KeyboardInterfaceInterceptor.key)
             }) {
-                Text(text = stringResource(R.string.unplug_dvorak_keyboard_style, interceptor.javaClass.simpleName))
+                Text(
+                    text = stringResource(
+                        R.string.unplug_dvorak_keyboard_style,
+                        interceptor.javaClass.simpleName
+                    )
+                )
             }
         }
     }

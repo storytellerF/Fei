@@ -115,10 +115,8 @@ class MainActivity : ComponentActivity() {
             addUri(uri)
         }
 
-    private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        if (it) {
-            bf.permissionChanged()
-        }
+    private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+        if (isGranted) bf.permissionChanged()
     }
     private val bf by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -157,6 +155,7 @@ class MainActivity : ComponentActivity() {
             val sendText: (String) -> Unit = {
                 scope.launch {
                     if (!bf.sendText(it)) {
+                        Toast.makeText(current, "未连接到任何设备", Toast.LENGTH_SHORT).show()
                         navController.navigate("hid")
                     }
                 }
@@ -193,7 +192,7 @@ class MainActivity : ComponentActivity() {
         }
         val intent = Intent(this, FeiService::class.java)
         startService(intent)
-        if (fei == null) bindService(intent, connection, 0)
+        if (fei == null) bindService(intent, feiServiceConnection, 0)
         CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
 
     }
@@ -245,12 +244,12 @@ class MainActivity : ComponentActivity() {
             NavHost(navController = navController, startDestination = "main") {
                 navPages(
                     infoList,
-                    ::deleteItem,
-                    ::saveToLocal,
                     navController,
                     port,
-                    sendText,
                     state,
+                    ::saveToLocal,
+                    ::deleteItem,
+                    sendText,
                     ::requestPermission
                 )
             }
@@ -337,18 +336,18 @@ class MainActivity : ComponentActivity() {
                 removeUri(path)
             }
             cacheInvalid()//when delete
-            fei?.feiService?.server?.channel?.trySend(SseEvent(data = "refresh"))
+            serverChannel?.trySend(SseEvent(data = "refresh"))
         }
     }
 
     private fun NavGraphBuilder.navPages(
         infoList: List<SharedFileInfo>,
-        deleteItem: (SharedFileInfo) -> Unit,
-        saveToLocal: (SharedFileInfo) -> Unit,
         navController: NavHostController,
         port: Int,
-        sendText: (String) -> Unit,
         state: HidState,
+        saveToLocal: (SharedFileInfo) -> Unit,
+        deleteItem: (SharedFileInfo) -> Unit,
+        sendText: (String) -> Unit,
         requestPermission: () -> Unit
     ) {
         composable("main") {
@@ -372,7 +371,9 @@ class MainActivity : ComponentActivity() {
         composable("hid") {
             HidScreen(state, requestPermission, {
                 bf.connectDevice(it)
-            }, sendText)
+            }, sendText) {
+                bf.disconnectDevice(it)
+            }
         }
         composable("safe") {
             SafePage()
@@ -381,7 +382,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        unbindService(connection)
+        unbindService(feiServiceConnection)
         unbindService(chromeConnection)
     }
 
@@ -409,11 +410,14 @@ class MainActivity : ComponentActivity() {
     private suspend fun saveUri(uri: Uri) {
         savedUriFile.appendText(uri.toString())
         cacheInvalid()//when save
-        fei?.feiService?.server?.channel?.send(SseEvent("refresh"))
+        serverChannel?.send(SseEvent("refresh"))
     }
 
+    @OptIn(ObsoleteCoroutinesApi::class)
+    private val serverChannel get() = fei?.feiService?.server?.channel
+
     var fei: FeiService.Fei? = null
-    private val connection = object : ServiceConnection {
+    private val feiServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             Toast.makeText(
                 this@MainActivity,

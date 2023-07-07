@@ -161,6 +161,34 @@ fun Context.connectDevice(
     }
 }
 
+fun Context.disconnectDevice(
+    hidDevice: BluetoothHidDevice?,
+    bondDevices: Set<BluetoothDevice>,
+    address: String
+): Boolean {
+    hidDevice ?: return false
+    val device = bondDevices.firstOrNull {
+        it.address == address
+    } ?: return false
+    return when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) == PackageManager.PERMISSION_GRANTED
+            ) hidDevice.disconnect(device) else false
+        }
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_ADMIN
+                ) == PackageManager.PERMISSION_GRANTED
+            ) hidDevice.disconnect(device) else false
+        }
+        else -> false
+    }
+}
+
 inline fun String.toKeyCode(block: (Pair<Int, Int>) -> Unit) {
     keyboardInterceptor.values.fold(this) { s, f ->
         f.intercept(s)
