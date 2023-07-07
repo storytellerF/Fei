@@ -31,6 +31,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.storyteller_f.fei.Colemak
 import com.storyteller_f.fei.Dvorak
 import com.storyteller_f.fei.HidState
 import com.storyteller_f.fei.KeyboardInterfaceInterceptor
@@ -184,17 +185,22 @@ private fun ConnectedPage(
                 Text(text = stringResource(id = R.string.send))
             }
         }
-        if (!keyboardInterceptor.contains(KeyboardInterfaceInterceptor.key)) {
-            Button(onClick = {
-                keyboardInterceptor.putIfAbsent(KeyboardInterfaceInterceptor.key, Dvorak)
-            }) {
-                Text(text = stringResource(R.string.plug_dvorak_keyboard_style))
+        val interceptor = keyboardInterceptor[KeyboardInterfaceInterceptor.key]
+        if (interceptor == null) {
+            Column {
+                listOf(Dvorak, Colemak).forEach {
+                    Button(onClick = {
+                        keyboardInterceptor.putIfAbsent(KeyboardInterfaceInterceptor.key, it)
+                    }) {
+                        Text(text = stringResource(R.string.plug_dvorak_keyboard_style, it.javaClass.simpleName))
+                    }
+                }
             }
         } else {
             Button(onClick = {
                 keyboardInterceptor.remove(KeyboardInterfaceInterceptor.key)
             }) {
-                Text(text = stringResource(R.string.unplug_dvorak_keyboard_style))
+                Text(text = stringResource(R.string.unplug_dvorak_keyboard_style, interceptor.javaClass.simpleName))
             }
         }
     }

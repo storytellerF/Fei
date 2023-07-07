@@ -5,32 +5,47 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.os.Build
 import androidx.compose.runtime.mutableStateMapOf
-
+import com.storyteller_f.fei.KeyboardInterceptor.Companion.qwerty
 
 val keyboardInterceptor = mutableStateMapOf<String, KeyboardInterceptor>()
 
-const val qwerty = "-=qwertyuiop[]asdfghjkl;'zxcvbnm,./"
-const val dvorak = "']x,doktfgsr-=a;hyujcvpzq/bi.nlmwe["
-
 interface KeyboardInterceptor {
     fun intercept(data: String): String
+
+    companion object {
+        @Suppress("SpellCheckingInspection")
+        const val qwerty = "-=qwertyuiop[]asdfghjkl;'zxcvbnm,./"
+    }
 }
 
 interface KeyboardInterfaceInterceptor : KeyboardInterceptor {
+    fun reflect(data: String, from: String, to: String) = data.map {
+        val indexOf = from.indexOf(it)
+        if (indexOf >= 0) {
+            to[indexOf]
+        } else it
+    }.joinToString("")
+
     companion object {
         const val key = "keyboard style"
     }
 }
 
 object Dvorak : KeyboardInterfaceInterceptor {
+    @Suppress("SpellCheckingInspection")
+    private const val dvorak = "']x,doktfgsr-=a;hyujcvpzq/bi.nlmwe["
+
     override fun intercept(data: String): String {
         assert(qwerty.length == dvorak.length)
-        return data.map {
-            val indexOf = qwerty.indexOf(it)
-            if (indexOf >= 0) {
-                dvorak[indexOf]
-            } else it
-        }.joinToString("")
+        return reflect(data, qwerty, dvorak)
+    }
+}
+
+object Colemak : KeyboardInterfaceInterceptor {
+    @Suppress("SpellCheckingInspection")
+    private const val colemak = "-=qwksfoil;r[]adgethynup'zxcvbjm,./"
+    override fun intercept(data: String): String {
+        return reflect(data, qwerty, colemak)
     }
 }
 
