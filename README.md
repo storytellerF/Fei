@@ -4,6 +4,8 @@
 [![Android Release](https://github.com/storytellerF/Fei/actions/workflows/android-release.yml/badge.svg)](https://github.com/storytellerF/Fei/actions/workflows/android-release.yml)
 ## 榧
 
+当前**Android Studio Hedgehog** 存在bug，不要使用这个项目编译release 包。 
+
 使用：
 
 选择➕可以选择要分享的文件。然后点击端口号会弹出来一个二维码，扫描二维码就能在浏览器中访问。
