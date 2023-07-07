@@ -1,8 +1,10 @@
 package com.storyteller_f.fei
 
 import android.Manifest
-import android.bluetooth.*
-import android.content.*
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -12,12 +14,41 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.browser.customtabs.*
-import androidx.compose.foundation.layout.*
+import androidx.browser.customtabs.CustomTabsCallback
+import androidx.browser.customtabs.CustomTabsClient
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.browser.customtabs.CustomTabsServiceConnection
+import androidx.browser.customtabs.CustomTabsSession
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -45,12 +76,20 @@ import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.service.SharedFileInfo
 import com.storyteller_f.fei.service.SseEvent
 import com.storyteller_f.fei.service.portFlow
-import com.storyteller_f.fei.ui.components.*
+import com.storyteller_f.fei.ui.components.ComposeBluetoothDevice
+import com.storyteller_f.fei.ui.components.FeiMainToolbar
+import com.storyteller_f.fei.ui.components.HidScreen
+import com.storyteller_f.fei.ui.components.Main
+import com.storyteller_f.fei.ui.components.MessagePage
+import com.storyteller_f.fei.ui.components.NavDrawer
+import com.storyteller_f.fei.ui.components.SafePage
+import com.storyteller_f.fei.ui.components.SettingPage
+import com.storyteller_f.fei.ui.components.SharedFile
+import com.storyteller_f.fei.ui.components.ShowQrCode
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.launch
 import java.io.File
-import java.util.*
 import kotlin.concurrent.thread
 
 
@@ -92,15 +131,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @OptIn(
-        ExperimentalMaterial3Api::class,
-        ExperimentalPermissionsApi::class
-    )
+    @OptIn(ExperimentalPermissionsApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-
+        bf.start()
         setContent {
             val state by bf.state()
             val port by LocalContext.current.portFlow.collectAsState(initial = FeiService.defaultPort)
