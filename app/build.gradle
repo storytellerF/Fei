@@ -54,32 +54,30 @@ android {
 }
 
 dependencies {
-    def compose_material3 = "1.1.1"
-    def nav_version = "2.6.0"
     def ktor_version = '2.3.1'
 
-    implementation 'androidx.core:core-ktx:1.10.1'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
-    implementation 'androidx.activity:activity-compose:1.7.2'
+    implementation libs.androidx.core.ktx
+    implementation libs.androidx.lifecycle.runtime.ktx
+    implementation libs.androidx.activity.compose
 
-    implementation "androidx.compose.ui:ui:$compose_version"
-    implementation "androidx.compose.ui:ui-tooling-preview:$compose_version"
-    androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_version"
-    debugImplementation "androidx.compose.ui:ui-tooling:$compose_version"
-    debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_version"
+    implementation libs.androidx.ui
+    implementation libs.androidx.ui.tooling.preview
+    androidTestImplementation libs.androidx.ui.test.junit4
+    debugImplementation libs.androidx.ui.tooling
+    debugImplementation libs.androidx.ui.test.manifest
 
-    implementation "androidx.compose.material3:material3:$compose_material3"
-    debugImplementation "androidx.customview:customview:1.1.0"
-    debugImplementation "androidx.customview:customview-poolingcontainer:1.0.0"
+    implementation libs.androidx.material3
+    debugImplementation libs.androidx.customview
+    debugImplementation libs.androidx.customview.poolingcontainer
 
-    implementation 'com.google.accompanist:accompanist-systemuicontroller:0.30.0'
-    implementation "com.google.accompanist:accompanist-permissions:0.30.0"
+    implementation libs.accompanist.systemuicontroller
+    implementation libs.accompanist.permissions
 
-    implementation "androidx.navigation:navigation-compose:$nav_version"
+    implementation libs.androidx.navigation.compose
 
-    testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    testImplementation libs.junit
+    androidTestImplementation libs.androidx.junit
+    androidTestImplementation libs.androidx.espresso.core
 
     //ktor
     implementation "io.ktor:ktor-server-core:" + ktor_version
@@ -101,21 +99,20 @@ dependencies {
     implementation("io.ktor:ktor-client-websockets:$ktor_version")
     implementation("io.ktor:ktor-client-cio:$ktor_version")
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+    implementation(libs.bundles.coruntines)
 
 
-    implementation 'org.slf4j:slf4j-android:1.7.36'
-    implementation 'com.google.zxing:core:3.5.1'
+    implementation libs.slf4j.android
+    implementation libs.core
 
-    implementation "com.github.JamalMulla:ComposePrefs3:1.0.4" // Current is 1.0.3
-    implementation "androidx.datastore:datastore-preferences:1.0.0"
+    implementation libs.compose.prefs3 // Current is 1.0.3
+    implementation libs.androidx.datastore.preferences
 
-    implementation('androidx.webkit:webkit:1.7.0')
-    implementation("androidx.browser:browser:1.5.0")
+    implementation(libs.androidx.webkit)
+    implementation(libs.androidx.browser)
 
-    implementation("androidx.core:core-splashscreen:1.0.1")
-    debugImplementation 'com.squareup.leakcanary:leakcanary-android:2.11'
+    implementation(libs.androidx.core.splashscreen)
+    debugImplementation libs.leakcanary.android
 
     def baoFolder = project.ext.baoFolder
     def baoModule = findProject(":bao:startup")
