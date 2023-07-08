@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId "com.storyteller_f.fei"
-        minSdk 26
+        minSdk 21
         targetSdk 33
         versionCode 6
         versionName "1.6"
@@ -54,7 +54,7 @@ android {
 }
 
 dependencies {
-    def compose_material3 = "1.1.0"
+    def compose_material3 = "1.1.1"
     def nav_version = "2.6.0"
     def ktor_version = '2.3.1'
 

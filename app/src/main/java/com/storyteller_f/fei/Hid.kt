@@ -14,29 +14,41 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import java.util.concurrent.Executors
 
-fun Context.alreadyBondedDevices(bluetoothManager: BluetoothManager) =
-    when {
+sealed interface BluetoothAction {
+    class NotSupport : BluetoothAction
+
+    class Done(val result: Boolean, val message: String) : BluetoothAction
+
+    object PermissionDenied : BluetoothAction
+}
+
+private fun Boolean.done(): BluetoothAction.Done {
+    return BluetoothAction.Done(this, "")
+}
+
+fun Context.alreadyBondedDevices(bluetoothManager: BluetoothManager): Set<BluetoothDevice> {
+    val adapter = bluetoothManager.adapter
+    return when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (ActivityCompat.checkSelfPermission(
                     this,
                     Manifest.permission.BLUETOOTH_CONNECT
                 ) == PackageManager.PERMISSION_GRANTED
             )
-                setOf<BluetoothDevice>(*bluetoothManager.adapter?.bondedDevices.orEmpty().toTypedArray())
-            else {
-                setOf()
-            }
+                adapter?.bondedDevices.orEmpty().toSet()
+            else setOf()
         }
 
         ActivityCompat.checkSelfPermission(
             this,
             Manifest.permission.BLUETOOTH_ADMIN
         ) == PackageManager.PERMISSION_GRANTED -> {
-            setOf<BluetoothDevice>(*bluetoothManager.adapter?.bondedDevices.orEmpty().toTypedArray())
+            adapter?.bondedDevices.orEmpty().toSet()
         }
 
         else -> setOf()
     }
+}
 
 
 fun Context.permissionOk(): Boolean {
@@ -137,27 +149,27 @@ fun Context.connectDevice(
     hidDevice: BluetoothHidDevice?,
     bondDevices: Set<BluetoothDevice>,
     address: String
-): Boolean {
-    hidDevice ?: return false
+): BluetoothAction {
+    hidDevice ?: return BluetoothAction.Done(false, "未连接HID")
     val device = bondDevices.firstOrNull {
         it.address == address
-    } ?: return false
+    } ?: return BluetoothAction.Done(false, "设备$address 不存在")
     return when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.BLUETOOTH_CONNECT
                 ) == PackageManager.PERMISSION_GRANTED
-            ) hidDevice.connect(device) else false
+            ) hidDevice.connect(device).done() else BluetoothAction.PermissionDenied
         }
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
             if (ContextCompat.checkSelfPermission(
                     this,
                     Manifest.permission.BLUETOOTH_ADMIN
                 ) == PackageManager.PERMISSION_GRANTED
-            ) hidDevice.connect(device) else false
+            ) hidDevice.connect(device).done() else BluetoothAction.PermissionDenied
         }
-        else -> false
+        else -> BluetoothAction.NotSupport()
     }
 }
 

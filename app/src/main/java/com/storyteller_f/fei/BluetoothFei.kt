@@ -184,13 +184,17 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
     }
 
     override fun connectDevice(address: String): Boolean {
-        return context.connectDevice(hidDevice, bondDevices, address).apply {
-            if (!this) showShortToast()
+        val result = context.connectDevice(hidDevice, bondDevices, address)
+        when (result) {
+            is BluetoothAction.Done -> if (!result.result) showShortToast(result.message)
+            is BluetoothAction.NotSupport -> showShortToast("不支持")
+            BluetoothAction.PermissionDenied -> showShortToast("未授权")
         }
+        return (result as? BluetoothAction.Done)?.result == true
     }
 
-    private fun showShortToast() =
-        Toast.makeText(context, "connect failed", Toast.LENGTH_SHORT).show()
+    private fun showShortToast(message: String) =
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
 
     override fun disconnectDevice(address: String): Boolean {
         return context.disconnectDevice(hidDevice, bondDevices, address)
