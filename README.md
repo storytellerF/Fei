@@ -1,10 +1,9 @@
 # Fei
 
 [![Android CI](https://github.com/storytellerF/Fei/actions/workflows/android.yml/badge.svg)](https://github.com/storytellerF/Fei/actions/workflows/android.yml)
-[![Android Release](https://github.com/storytellerF/Fei/actions/workflows/android-release.yml/badge.svg)](https://github.com/storytellerF/Fei/actions/workflows/android-release.yml)
 ## 榧
 
-当前**Android Studio Hedgehog** 存在bug，不要使用这个项目编译release 包。 
+当前**Android Studio Hedgehog** 与agp 存在bug，不要使用这个项目编译release 包。 
 
 使用：
 
