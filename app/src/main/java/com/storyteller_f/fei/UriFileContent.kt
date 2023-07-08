@@ -2,6 +2,7 @@ package com.storyteller_f.fei
 
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import io.ktor.http.*
@@ -22,7 +23,11 @@ import java.nio.channels.FileChannel
 import kotlin.coroutines.CoroutineContext
 
 suspend fun ApplicationCall.respondUri(context: Context, file: Uri, configure: OutgoingContent.() -> Unit = {}) {
-    val it = context.contentResolver.query(file, null, null, null)
+    val it = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.contentResolver.query(file, null, null, null)
+    } else {
+        context.contentResolver.query(file, null, null, null, null)
+    }
     if (it == null) {
         respond(HttpStatusCode.NotFound)
     } else {
@@ -32,7 +37,8 @@ suspend fun ApplicationCall.respondUri(context: Context, file: Uri, configure: O
             } else {
                 val mimeTypeIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
                 val sizeIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-                val lastModifiedIndex = it.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                val lastModifiedIndex =
+                    it.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
                 val mimeType = it.getString(mimeTypeIndex)
                 val size = it.getLong(sizeIndex)
                 val lastModified = it.getLong(lastModifiedIndex)
@@ -42,7 +48,12 @@ suspend fun ApplicationCall.respondUri(context: Context, file: Uri, configure: O
                     respond(HttpStatusCode.NotFound)
                 } else {
                     val content =
-                        UriFileContent(contentType = parse, parcelFileDescriptor = fileDescriptor, length = size, lastModified = lastModified).apply(
+                        UriFileContent(
+                            contentType = parse,
+                            parcelFileDescriptor = fileDescriptor,
+                            length = size,
+                            lastModified = lastModified
+                        ).apply(
                             configure
                         )
                     respond(content)
@@ -87,7 +98,6 @@ fun FileDescriptor.readChannel(
             "endInclusive points to the position out of the file: file size = $length, endInclusive = $endInclusive"
         }
 
-        @Suppress("BlockingMethodInNonBlockingContext")
         FileInputStream(this@readChannel).use { file ->
             val fileChannel: FileChannel = file.channel
             if (start > 0) {

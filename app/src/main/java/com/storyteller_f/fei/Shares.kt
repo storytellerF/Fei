@@ -2,6 +2,7 @@ package com.storyteller_f.fei
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.core.net.toUri
@@ -12,20 +13,27 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.RandomAccessFile
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
 
 val shares = MutableStateFlow<List<SharedFileInfo>>(listOf())
+lateinit var uriFilePath: String
+val isUriFilePathInitialised get() = ::uriFilePath.isInitialized
 
 val savedUriFile: MappedByteBuffer by lazy {
-    val file = File("/data/data/com.storyteller_f.fei/files/list.txt").ensureFile()
-    val channel = FileChannel.open(
-        file.toPath(),
-        StandardOpenOption.READ,
-        StandardOpenOption.WRITE,
-        StandardOpenOption.CREATE
-    )
+    val file = File(uriFilePath).ensureFile()
+    val channel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        FileChannel.open(
+            file.toPath(),
+            StandardOpenOption.READ,
+            StandardOpenOption.WRITE,
+            StandardOpenOption.CREATE
+        )
+    } else {
+        RandomAccessFile(file, "rw").channel
+    }
     channel.map(FileChannel.MapMode.READ_WRITE, 0, 1024)
 }
 

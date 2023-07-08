@@ -1,6 +1,7 @@
 package com.storyteller_f.fei.service
 
 import android.net.Uri
+import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import androidx.core.net.toFile
@@ -206,8 +207,12 @@ class FeiServer(private val feiService: FeiService) {
         install(PartialContent)
         install(AutoHeadResponse)
         install(io.ktor.server.websocket.WebSockets) {
-            pingPeriod = Duration.ofSeconds(15)
-            timeout = Duration.ofSeconds(15)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                pingPeriod = Duration.ofSeconds(15)
+            } else pingPeriodMillis = 15000
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                timeout = Duration.ofSeconds(15)
+            } else timeoutMillis = 15000
             maxFrameSize = Long.MAX_VALUE
             masking = false
             contentConverter = KotlinxWebsocketSerializationConverter(Json)

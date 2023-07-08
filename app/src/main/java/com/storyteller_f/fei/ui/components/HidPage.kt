@@ -199,7 +199,7 @@ private fun ConnectedPage(
             Column {
                 listOf(Dvorak, Colemak).forEach {
                     Button(onClick = {
-                        keyboardInterceptor.putIfAbsent(KeyboardInterfaceInterceptor.key, it)
+                        keyboardInterceptor[KeyboardInterfaceInterceptor.key] = it
                     }) {
                         Text(
                             text = stringResource(

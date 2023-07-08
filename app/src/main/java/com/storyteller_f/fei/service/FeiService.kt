@@ -100,7 +100,6 @@ class FeiService : Service() {
     override fun onDestroy() {
         Log.d(TAG, "onDestroy() called")
         super.onDestroy()
-        stopForeground(STOP_FOREGROUND_REMOVE)
         server.stopAsync()
         scope.cancel()
     }

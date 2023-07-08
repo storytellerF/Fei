@@ -138,6 +138,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         bf.start()
+        if (!isUriFilePathInitialised) {
+            uriFilePath = File(filesDir, "list.txt").absolutePath
+        }
         setContent {
             val state by bf.state()
             val port by LocalContext.current.portFlow.collectAsState(initial = FeiService.defaultPort)

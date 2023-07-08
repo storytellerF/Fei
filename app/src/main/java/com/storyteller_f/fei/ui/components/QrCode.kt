@@ -44,7 +44,6 @@ import com.storyteller_f.fei.R
 import com.storyteller_f.fei.allIp
 import com.storyteller_f.fei.service.FeiService
 import java.util.Collections
-import java.util.stream.IntStream
 
 @Composable
 fun ShowQrCode(
@@ -155,12 +154,12 @@ fun String.createQRImage(width: Int, height: Int): Bitmap {
         Collections.singletonMap(EncodeHintType.CHARACTER_SET, "utf-8")
     )
     return Bitmap.createBitmap(
-        IntStream.range(0, height).flatMap { h: Int ->
-            IntStream.range(0, width).map { w: Int ->
+        (0 until height).flatMap { h: Int ->
+            (0 until width).map { w: Int ->
                 if (bitMatrix[w, h]
                 ) Color.BLACK else Color.WHITE
             }
-        }.toArray(),
+        }.toIntArray(),
         width, height, Bitmap.Config.ARGB_8888
     )
 }
