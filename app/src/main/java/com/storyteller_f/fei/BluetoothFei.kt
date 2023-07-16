@@ -41,7 +41,7 @@ interface BluetoothFeiService {
     fun start()
 
     @Composable
-    fun state() : State<HidState>
+    fun state(): State<HidState>
     fun permissionChanged()
 }
 
@@ -53,6 +53,7 @@ class NoOpBluetoothFei : BluetoothFeiService {
 
     override suspend fun sendText(content: String) = false
     override fun start() = Unit
+
     @Composable
     override fun state(): State<HidState> {
         return remember {
@@ -67,22 +68,64 @@ class NoOpBluetoothFei : BluetoothFeiService {
 
 @RequiresApi(Build.VERSION_CODES.P)
 class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
-    val bluetoothManager: BluetoothManager = context.getSystemService(BluetoothManager::class.java)
+    private val bluetoothManager: BluetoothManager =
+        context.getSystemService(BluetoothManager::class.java)
     private val adapter = bluetoothManager.adapter
-    var bluetoothState by mutableStateOf(adapter?.isEnabled ?: false)
-    var bondDevices by mutableStateOf(
+    private var bluetoothState by mutableStateOf(adapter?.isEnabled ?: false)
+    private var bondDevices by mutableStateOf(
         context.alreadyBondedDevices(bluetoothManager)
     )
     private var bluetoothPermissionIndex by mutableStateOf(0)
 
     private val channel = Channel<String>()
-    var connectedDevice by mutableStateOf<BluetoothDevice?>(null)
-    var connecting by mutableStateOf<String?>(null)
+    private var connectedDevice by mutableStateOf<BluetoothDevice?>(null)
+    private var connecting by mutableStateOf<String?>(null)
+
+    var hidDevice: BluetoothHidDevice? = null
+    var hidRegistered: Boolean = false
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    val bluetoothProfileConnection = object : BluetoothProfile.ServiceListener {
+        override fun onServiceConnected(p0: Int, p1: BluetoothProfile?) {
+            Log.d(TAG, "onServiceConnected() called with: p0 = $p0, p1 = $p1 $hidRegistered")
+            if (p0 == BluetoothProfile.HID_DEVICE && p1 != null) {
+                val bluetoothHidDevice = p1 as BluetoothHidDevice
+                hidDevice = bluetoothHidDevice
+                if (!hidRegistered) {
+                    context.registerAsHid(bluetoothHidDevice, registerCallback)
+                }
+            }
+        }
+
+        override fun onServiceDisconnected(p0: Int) {
+            Log.d(TAG, "onServiceDisconnected() called with: p0 = $p0")
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.P)
+    val registerCallback = object : BluetoothHidDevice.Callback() {
+        override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
+            super.onAppStatusChanged(pluggedDevice, registered)
+            Log.d(
+                TAG,
+                "onAppStatusChanged() called with: pluggedDevice = $pluggedDevice, registered = $registered"
+            )
+            hidRegistered = registered
+        }
+
+        override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
+            super.onConnectionStateChanged(device, state)
+            Log.d(TAG, "onConnectionStateChanged() called with: device = $device, state = $state")
+            connectedDevice = if (state == BluetoothProfile.STATE_CONNECTED) device else null
+            connecting = if (state == BluetoothProfile.STATE_CONNECTING) device?.address else null
+        }
+    }
 
     override fun start() {
+        Log.d(TAG, "start() called $hidRegistered $hidDevice")
         adapter?.getProfileProxy(
             context,
-            bluetoothConnection,
+            bluetoothProfileConnection,
             BluetoothProfile.HID_DEVICE
         )
         val bluetoothStateReceiver = object : BroadcastReceiver() {
@@ -96,15 +139,7 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
                     }
 
                     BluetoothDevice.ACTION_FOUND -> {
-                        val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            intent.getParcelableExtra(
-                                BluetoothDevice.EXTRA_DEVICE,
-                                BluetoothDevice::class.java
-                            )
-                        } else {
-                            @Suppress("DEPRECATION")
-                            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                        }
+                        val device = bluetoothDevice(intent)
                         if (device != null && context.isBonded(device)) {
                             bondDevices += device
                         }
@@ -135,6 +170,17 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
         }
     }
 
+    private fun bluetoothDevice(intent: Intent) =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(
+                BluetoothDevice.EXTRA_DEVICE,
+                BluetoothDevice::class.java
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+        }
+
     @Composable
     override fun state(): State<HidState> {
         return produceState<HidState>(
@@ -162,25 +208,6 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
     override fun permissionChanged() {
         refreshBondDevices()
         bluetoothPermissionIndex = bluetoothPermissionIndex.inc()
-    }
-
-    var hidDevice: BluetoothHidDevice? = null
-
-    @RequiresApi(Build.VERSION_CODES.P)
-    val bluetoothConnection = object : BluetoothProfile.ServiceListener {
-        override fun onServiceConnected(p0: Int, p1: BluetoothProfile?) {
-            if (p0 == BluetoothProfile.HID_DEVICE && p1 != null) {
-                val bluetoothHidDevice = p1 as BluetoothHidDevice
-                hidDevice = bluetoothHidDevice
-                if (!hidRegistered) {
-                    Log.d(TAG, "onServiceConnected: 没有连接过蓝牙，开始连接")
-                    context.registerAsHid(bluetoothHidDevice, registerCallback)
-                }
-            }
-        }
-
-        override fun onServiceDisconnected(p0: Int) {
-        }
     }
 
     override fun connectDevice(address: String): Boolean {
@@ -211,27 +238,6 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
 
     override fun refreshBondDevices() {
         bondDevices += context.alreadyBondedDevices(bluetoothManager)
-    }
-
-    var hidRegistered: Boolean = false
-
-    @RequiresApi(Build.VERSION_CODES.P)
-    val registerCallback = object : BluetoothHidDevice.Callback() {
-        override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
-            super.onAppStatusChanged(pluggedDevice, registered)
-            Log.d(
-                TAG,
-                "onAppStatusChanged() called with: pluggedDevice = $pluggedDevice, registered = $registered"
-            )
-            hidRegistered = registered
-        }
-
-        override fun onConnectionStateChanged(device: BluetoothDevice?, state: Int) {
-            super.onConnectionStateChanged(device, state)
-            Log.d(TAG, "onConnectionStateChanged() called with: device = $device, state = $state")
-            connectedDevice = if (state == BluetoothProfile.STATE_CONNECTED) device else null
-            connecting = if (state == BluetoothProfile.STATE_CONNECTING) device?.address else null
-        }
     }
 
     companion object {

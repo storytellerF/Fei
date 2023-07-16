@@ -1,6 +1,7 @@
 package com.storyteller_f.fei
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothHidDevice
 import android.bluetooth.BluetoothHidDeviceAppSdpSettings
@@ -9,13 +10,14 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
 import java.util.concurrent.Executors
 
 sealed interface BluetoothAction {
-    class NotSupport : BluetoothAction
+    object NotSupport : BluetoothAction
 
     class Done(val result: Boolean, val message: String) : BluetoothAction
 
@@ -65,6 +67,17 @@ fun Context.permissionOk(): Boolean {
     }
 }
 
+fun Context.readHidDescriptor(): ByteArray {
+    return assets.open("hid").use { stream ->
+        stream.bufferedReader().lineSequence().flatMap { line ->
+            val lastCommas = line.lastIndexOf(", ")
+            line.substring(0, lastCommas).split(", ").map {
+                it.substring(2).toInt(16).toByte()
+            }
+        }.toList().toByteArray()
+    }
+}
+
 fun Context.registerAsHid(
     bluetoothHidDevice: BluetoothHidDevice,
     registerCallback: BluetoothHidDevice.Callback
@@ -78,11 +91,11 @@ fun Context.registerAsHid(
             return
         }
         val sdp = BluetoothHidDeviceAppSdpSettings(
-            "fei",
-            "auth input address",
-            "provider",
+            "Fei HID",
+            "auto input address",
+            "storytellerF",
             BluetoothHidDevice.SUBCLASS1_COMBO,
-            MainActivity.Descriptor
+            readHidDescriptor()
         )
         bluetoothHidDevice.registerApp(
             sdp,
@@ -125,10 +138,7 @@ suspend fun Context.sendReport(
                 Manifest.permission.BLUETOOTH_CONNECT
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            println(hidDevice.sendReport(selectedDevice, 2, byteArrayOf(modification.toByte(), code.toByte())))
-            delay(100)
-            println(hidDevice.sendReport(selectedDevice, 2, byteArrayOf(0, 0)))
-            delay(100)
+            sendKeyEvent(hidDevice, selectedDevice, modification, code)
         }
     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
         if (ActivityCompat.checkSelfPermission(
@@ -136,13 +146,30 @@ suspend fun Context.sendReport(
                 Manifest.permission.BLUETOOTH_ADMIN
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            hidDevice.sendReport(selectedDevice, 2, byteArrayOf(modification.toByte(), code.toByte()))
-            delay(100)
-            hidDevice.sendReport(selectedDevice, 2, byteArrayOf(0, 0))
-            delay(100)
+            sendKeyEvent(hidDevice, selectedDevice, modification, code)
         }
     }
 
+}
+
+@RequiresApi(Build.VERSION_CODES.P)
+@SuppressLint("MissingPermission")
+private suspend fun sendKeyEvent(
+    hidDevice: BluetoothHidDevice,
+    selectedDevice: BluetoothDevice,
+    modification: Int,
+    code: Int
+) {
+    val downResult = hidDevice.sendReport(
+        selectedDevice,
+        2,
+        byteArrayOf(modification.toByte(), code.toByte())
+    )
+    Log.d("System", "sendReport: down $code $downResult")
+    delay(100)
+    val upResult = hidDevice.sendReport(selectedDevice, 2, byteArrayOf(0, 0))
+    Log.d("System", "sendReport: up $upResult")
+    delay(100)
 }
 
 fun Context.connectDevice(
@@ -162,6 +189,7 @@ fun Context.connectDevice(
                 ) == PackageManager.PERMISSION_GRANTED
             ) hidDevice.connect(device).done() else BluetoothAction.PermissionDenied
         }
+
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -169,7 +197,8 @@ fun Context.connectDevice(
                 ) == PackageManager.PERMISSION_GRANTED
             ) hidDevice.connect(device).done() else BluetoothAction.PermissionDenied
         }
-        else -> BluetoothAction.NotSupport()
+
+        else -> BluetoothAction.NotSupport
     }
 }
 
