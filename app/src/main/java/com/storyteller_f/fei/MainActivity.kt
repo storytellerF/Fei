@@ -111,13 +111,14 @@ sealed class HidState {
 
 class MainActivity : ComponentActivity() {
     private val pickFile =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uri ->
             addUri(uri)
         }
 
-    private val request = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-        if (isGranted) bf.permissionChanged()
-    }
+    private val request =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) bf.permissionChanged()
+        }
     private val bf by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             BluetoothFei(this)
@@ -400,11 +401,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun addUri(uri: Uri?) {
-        uri ?: return
-        contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    private fun addUri(uri: List<Uri>) {
         lifecycleScope.launch {
-            saveUri(uri)
+            uri.forEach {
+                contentResolver.takePersistableUriPermission(
+                    it,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+                saveUri(it)
+            }
         }
 
     }
