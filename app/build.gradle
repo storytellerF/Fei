@@ -51,11 +51,18 @@ android {
             pickFirsts += ['META-INF/*']
         }
     }
+//    splits {
+//
+//        // Configures multiple APKs based on ABI.
+//        abi {
+//            enable true
+//            include "x86", "x86_64", "arm64-v8a", "armeabi-v7a"
+//            universalApk true
+//        }
+//    }
 }
 
 dependencies {
-    def ktor_version = '2.3.1'
-
     implementation libs.androidx.core.ktx
     implementation libs.androidx.lifecycle.runtime.ktx
     implementation libs.androidx.activity.compose
@@ -80,24 +87,8 @@ dependencies {
     androidTestImplementation libs.androidx.espresso.core
 
     //ktor
-    implementation "io.ktor:ktor-server-core:" + ktor_version
-    implementation "io.ktor:ktor-server-netty:$ktor_version"
-
-    implementation("io.ktor:ktor-server-host-common:$ktor_version")
-    implementation("io.ktor:ktor-server-status-pages:$ktor_version")
-    implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-    implementation("io.ktor:ktor-server-thymeleaf:$ktor_version")
-    implementation("io.ktor:ktor-server-html-builder:$ktor_version")
-    implementation("io.ktor:ktor-server-websockets:$ktor_version")
-    implementation("io.ktor:ktor-server-call-logging:$ktor_version")
-    implementation("io.ktor:ktor-server-partial-content:$ktor_version")
-    implementation("io.ktor:ktor-server-auto-head-response:$ktor_version")
-    implementation("io.ktor:ktor-server-auth:$ktor_version")
-    implementation("io.ktor:ktor-server-sessions:$ktor_version")
-
-    implementation("io.ktor:ktor-client-websockets:$ktor_version")
-    implementation("io.ktor:ktor-client-cio:$ktor_version")
+    implementation(libs.bundles.ktor.server)
+    implementation(libs.bundles.ktor.client)
 
     implementation(libs.bundles.coruntines)
 

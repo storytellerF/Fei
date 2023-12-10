@@ -1,9 +1,9 @@
 [versions]
-accompanist-permissions = "0.30.0"
-activity-compose = "1.7.2"
-androidx-core-ktx = "1.10.1"
+accompanist-permissions = "0.30.1"
+activity-compose = "1.8.1"
+androidx-core-ktx = "1.12.0"
 androidx-junit = "1.1.5"
-browser = "1.5.0"
+browser = "1.7.0"
 compose-prefs3 = "1.0.4"
 core = "3.5.1"
 core-splashscreen = "1.0.1"
@@ -12,14 +12,15 @@ customview = "1.1.0"
 datastore-preferences = "1.0.0"
 espresso-core = "3.5.1"
 junit = "4.13.2"
-kotlinx-coroutines = "1.6.4"
-leakcanary-android = "2.11"
-lifecycle-runtime-ktx = "2.6.1"
-material3 = "1.1.1"
-navigation-compose = "2.6.0"
+kotlinx-coroutines = "1.7.3"
+ktor-server-core = "2.3.4"
+leakcanary-android = "2.12"
+lifecycle-runtime-ktx = "2.6.2"
+material3 = "1.1.2"
+navigation-compose = "2.7.5"
 slf4j-android = "1.7.36"
-ui = "1.4.3"
-webkit = "1.7.0"
+ui = "1.5.4"
+webkit = "1.9.0"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
@@ -47,8 +48,31 @@ core = { module = "com.google.zxing:core", version.ref = "core" }
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor-server-core" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor-server-core" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor-server-core" }
+ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor-server-core" }
+ktor-server-auto-head-response = { module = "io.ktor:ktor-server-auto-head-response", version.ref = "ktor-server-core" }
+ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor-server-core" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor-server-core" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor-server-core" }
+ktor-server-host-common = { module = "io.ktor:ktor-server-host-common", version.ref = "ktor-server-core" }
+ktor-server-html-builder = { module = "io.ktor:ktor-server-html-builder", version.ref = "ktor-server-core" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor-server-core" }
+ktor-server-partial-content = { module = "io.ktor:ktor-server-partial-content", version.ref = "ktor-server-core" }
+ktor-server-sessions = { module = "io.ktor:ktor-server-sessions", version.ref = "ktor-server-core" }
+ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor-server-core" }
+ktor-server-thymeleaf = { module = "io.ktor:ktor-server-thymeleaf", version.ref = "ktor-server-core" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor-server-core" }
 leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary-android" }
 slf4j-android = { module = "org.slf4j:slf4j-android", version.ref = "slf4j-android" }
 
 [bundles]
 coruntines = ["kotlinx-coroutines-android", "kotlinx-coroutines-core"]
+ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-auth",
+    "ktor-server-auto-head-response", "ktor-server-call-logging",
+    "ktor-server-content-negotiation", "ktor-server-host-common",
+    "ktor-server-html-builder", "ktor-server-partial-content",
+    "ktor-server-sessions", "ktor-server-status-pages",
+    "ktor-server-thymeleaf", "ktor-server-websockets", "ktor-serialization-kotlinx-json"]
+ktor-client = ["ktor-client-cio", "ktor-client-websockets"]
