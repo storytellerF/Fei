@@ -144,7 +144,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val state by bf.state()
-            val port by LocalContext.current.portFlow.collectAsState(initial = FeiService.defaultPort)
+            val port by LocalContext.current.portFlow.collectAsState(initial = FeiService.DEFAULT_PORT)
             val drawerState = rememberDrawerState(DrawerValue.Closed)
             val navController = rememberNavController()
             val scope = rememberCoroutineScope()

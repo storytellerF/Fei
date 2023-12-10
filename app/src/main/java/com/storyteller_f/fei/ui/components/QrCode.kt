@@ -54,7 +54,7 @@ fun ShowQrCode(
 ) {
     val width = 200
     var selectedIp by remember {
-        mutableStateOf(FeiService.defaultAddress)
+        mutableStateOf(FeiService.DEFAULT_ADDRESS)
     }
     val url by remember {
         derivedStateOf {
@@ -68,7 +68,7 @@ fun ShowQrCode(
     }
     var expanded by remember { mutableStateOf(false) }
 
-    val ipList by produceState(initialValue = listOf(FeiService.defaultAddress)) {
+    val ipList by produceState(initialValue = listOf(FeiService.DEFAULT_ADDRESS)) {
         value = allIp()
     }
     var quickSelectData by remember {

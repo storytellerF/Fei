@@ -11,8 +11,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.AccountBox
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,7 +52,7 @@ import com.storyteller_f.fei.service.FeiService
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun FeiMainToolbar(
-    port: String = FeiService.defaultPort.toString(),
+    port: String = FeiService.DEFAULT_PORT.toString(),
     restartService: () -> Unit = {},
     stopService: () -> Unit = {},
     sendText: (String) -> Unit = {},
@@ -130,7 +143,7 @@ fun FeiMainToolbar(
 @Preview
 @Composable
 @OptIn(ExperimentalComposeUiApi::class)
-fun SettingPage(port: String = FeiService.defaultPort.toString()) {
+fun SettingPage(port: String = FeiService.DEFAULT_PORT.toString()) {
     PrefsScreen(dataStore = LocalContext.current.dataStore) {
         prefsItem {
             EditTextPref(
@@ -139,7 +152,7 @@ fun SettingPage(port: String = FeiService.defaultPort.toString()) {
                 summary = "server listen on $port",
                 dialogTitle = stringResource(R.string.port_setting),
                 dialogMessage = stringResource(R.string.please_input_a_valid_port),
-                defaultValue = FeiService.defaultPort.toString()
+                defaultValue = FeiService.DEFAULT_PORT.toString()
             )
         }
     }

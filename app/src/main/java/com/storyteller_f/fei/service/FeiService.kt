@@ -13,34 +13,24 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.dataStore
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.websocket.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.*
-import io.ktor.server.application.*
-import io.ktor.server.engine.*
-import io.ktor.server.netty.*
-import io.ktor.server.plugins.autohead.*
-import io.ktor.server.plugins.callloging.*
-import io.ktor.server.plugins.partialcontent.*
-import io.ktor.server.plugins.statuspages.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
-import io.ktor.server.thymeleaf.*
-import io.ktor.server.websocket.*
-import io.ktor.websocket.*
-import io.ktor.websocket.serialization.*
-import kotlinx.coroutines.*
+import io.ktor.http.CacheControl
+import io.ktor.http.ContentType
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.response.cacheControl
+import io.ktor.server.response.respondTextWriter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.util.*
+import kotlinx.coroutines.launch
 
 val Context.portFlow
     get() = dataStore.data.map {
-        it[stringPreferencesKey("port")]?.toInt() ?: FeiService.defaultPort
+        it[stringPreferencesKey("port")]?.toInt() ?: FeiService.DEFAULT_PORT
     }
 
 class FeiService : Service() {
@@ -63,7 +53,7 @@ class FeiService : Service() {
     override fun onCreate() {
         Log.d(TAG, "onCreate() called")
         super.onCreate()
-        val channelId = foregroundChannelId
+        val channelId = FOREGROUND_CHANNEL_ID
         val channel =
             NotificationChannelCompat.Builder(channelId, NotificationManagerCompat.IMPORTANCE_MIN)
                 .apply {
@@ -86,10 +76,10 @@ class FeiService : Service() {
     private fun postNotify(managerCompat: NotificationManagerCompat, message: String) {
         if (managerCompat.areNotificationsEnabled()) {
             val notification =
-                NotificationCompat.Builder(this, foregroundChannelId)
+                NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentTitle(getString(R.string.app_name)).setContentText(message).build()
-            startForeground(foreground_notification_id, notification)
+            startForeground(FOREGROUND_NOTIFICATION_ID, notification)
         }
     }
 
@@ -129,11 +119,11 @@ class FeiService : Service() {
 
     companion object {
         private const val TAG = "FeiService"
-        private const val foreground_notification_id = 10
-        private const val foregroundChannelId = "foreground"
-        const val defaultPort = 8080
-        const val listenerAddress = "0.0.0.0"
-        const val defaultAddress = "127.0.0.1"
+        private const val FOREGROUND_NOTIFICATION_ID = 10
+        private const val FOREGROUND_CHANNEL_ID = "foreground"
+        const val DEFAULT_PORT = 8080
+        const val LISTENER_ADDRESS = "0.0.0.0"
+        const val DEFAULT_ADDRESS = "127.0.0.1"
     }
 }
 

@@ -88,14 +88,14 @@ class FeiServer(private val feiService: FeiService) {
     var channel: BroadcastChannel<SseEvent>? = null
     private var selfClient: HttpClient? = null
     private var selfSession: DefaultClientWebSocketSession? = null
-    var port = FeiService.defaultPort
+    var port = FeiService.DEFAULT_PORT
     val messagesCache = MutableStateFlow(listOf<Message>())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun startInternal() {
         Log.d(TAG, "startInternal() called")
         try {
-            server = embeddedServer(Netty, port = port, host = FeiService.listenerAddress) {
+            server = embeddedServer(Netty, port = port, host = FeiService.LISTENER_ADDRESS) {
                 plugPlugins(feiService)
                 channel = produce {
                     var n = 0
