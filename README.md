@@ -1,9 +1,8 @@
 # Fei
 
 [![Android CI](https://github.com/storytellerF/Fei/actions/workflows/android.yml/badge.svg)](https://github.com/storytellerF/Fei/actions/workflows/android.yml)
-## 榧
 
-当前**Android Studio Hedgehog** 与agp 存在bug，不要使用这个项目编译release 包。 
+## 榧
 
 使用：
 
@@ -11,7 +10,7 @@
 
 基于webSocket 的即时通讯： your ip:your port/messages 
 
-todo: 
+todo:
 
 1. - [x] 即时聊天
 2. - [ ] 上传文件

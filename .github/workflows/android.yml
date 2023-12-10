@@ -33,7 +33,7 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew build
 
-      - uses: noriban/sign-android-release@v3
+      - uses: storytellerF/sign-android-release@master
         name: Sign app APK
         # ID used to access action output
         id: sign_app
@@ -51,7 +51,12 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: Signed app bundle
-          path: ${{steps.sign_app.outputs.signedReleaseFile}}
+          path: |
+            ${{ steps.sign_app.outputs.signedReleaseFile0 }}
+            ${{ steps.sign_app.outputs.signedReleaseFile1 }}
+            ${{ steps.sign_app.outputs.signedReleaseFile2 }}
+            ${{ steps.sign_app.outputs.signedReleaseFile3 }}
+            ${{ steps.sign_app.outputs.signedReleaseFile4 }}
 
   release:
     name: Release APK
