@@ -111,4 +111,10 @@ dependencies {
         implementation(baoModule)
     else
         implementation("com.github.storytellerF.Bao:startup:2.3.0")
+
+    def yongFolder = project.ext.yongFolder
+    def yongModule = findProject(":yong:library")
+    if (yongFolder == "local" && yongModule != null) {
+        testImplementation(yongModule)
+    }
 }

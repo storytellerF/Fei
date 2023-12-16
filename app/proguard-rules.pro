@@ -192,3 +192,14 @@
 # Ktor
 -keep class io.ktor.** { *; }
 -keep class io.netty.** { *; }
+
+-dontwarn com.android.tools.lint.client.api.IssueRegistry
+-dontwarn com.android.tools.lint.client.api.Vendor
+-dontwarn com.android.tools.lint.detector.api.Category
+-dontwarn com.android.tools.lint.detector.api.Detector$UastScanner
+-dontwarn com.android.tools.lint.detector.api.Detector
+-dontwarn com.android.tools.lint.detector.api.Implementation
+-dontwarn com.android.tools.lint.detector.api.Issue$Companion
+-dontwarn com.android.tools.lint.detector.api.Issue
+-dontwarn com.android.tools.lint.detector.api.Scope
+-dontwarn com.android.tools.lint.detector.api.Severity

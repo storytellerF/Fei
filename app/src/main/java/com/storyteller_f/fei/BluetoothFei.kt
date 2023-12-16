@@ -17,6 +17,7 @@ import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -75,7 +76,7 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
     private var bondDevices by mutableStateOf(
         context.alreadyBondedDevices(bluetoothManager)
     )
-    private var bluetoothPermissionIndex by mutableStateOf(0)
+    private var bluetoothPermissionIndex by mutableIntStateOf(0)
 
     private val channel = Channel<String>()
     private var connectedDevice by mutableStateOf<BluetoothDevice?>(null)

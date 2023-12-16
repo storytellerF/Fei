@@ -16,19 +16,20 @@ dependencyResolutionManagement {
 rootProject.name = "Fei"
 include ':app'
 
-def baoFolder = ext.baoFolder
-def home = System.getProperty("user.home")
-def debugBaoFolder
-if (baoFolder == "local")
-    debugBaoFolder = file("$home/AndroidStudioProjects/Bao/")
-else
-    debugBaoFolder = null
-if (debugBaoFolder != null && debugBaoFolder.exists()) {
-    def l = new String[]{
-            "startup", "bao-library"
-    }
-    for (sub in l) {
-        include("bao:$sub")
-        project(":bao:$sub").projectDir = file("${debugBaoFolder.absolutePath}/$sub")
+debug(ext.baoFolder, "AndroidStudioProjects/Bao", new String[]{"startup", "bao-library"}, "bao")
+debug(ext.yongFolder, "Projects/Yong", new String[]{"checks", "library"}, "yong")
+
+def debug(String location, String projectName, String[] modules, String subProjectName) {
+    def home = System.getProperty("user.home")
+    def folder
+    if (location == "local")
+        folder = file("$home/$projectName/")
+    else
+        folder = null
+    if (folder != null && folder.exists()) {
+        for (sub in (modules)) {
+            include("$subProjectName:$sub")
+            project(":$subProjectName:$sub").projectDir = file("${folder.absolutePath}/$sub")
+        }
     }
 }
