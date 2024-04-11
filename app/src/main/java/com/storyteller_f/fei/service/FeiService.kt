@@ -17,12 +17,13 @@ import io.ktor.http.CacheControl
 import io.ktor.http.ContentType
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.cacheControl
-import io.ktor.server.response.respondTextWriter
+import io.ktor.server.response.respondBytesWriter
+import io.ktor.utils.io.writeStringUtf8
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -132,21 +133,20 @@ data class SseEvent(val data: String, val event: String? = null, val id: String?
 @kotlinx.serialization.Serializable
 data class SharedFileInfo(val uri: String, val name: String)
 
-@Suppress("BlockingMethodInNonBlockingContext")
-suspend fun ApplicationCall.respondSse(events: ReceiveChannel<SseEvent>) {
+suspend fun ApplicationCall.respondSse(eventFlow: Flow<SseEvent>) {
     response.cacheControl(CacheControl.NoCache(null))
-    respondTextWriter(contentType = ContentType.Text.EventStream) {
-        for (event in events) {
+    respondBytesWriter(contentType = ContentType.Text.EventStream) {
+        eventFlow.collect { event ->
             if (event.id != null) {
-                write("id: ${event.id}\n")
+                writeStringUtf8("id: ${event.id}\n")
             }
             if (event.event != null) {
-                write("event: ${event.event}\n")
+                writeStringUtf8("event: ${event.event}\n")
             }
             for (dataLine in event.data.lines()) {
-                write("data: $dataLine\n")
+                writeStringUtf8("data: $dataLine\n")
             }
-            write("\n")
+            writeStringUtf8("\n")
             flush()
         }
     }

@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
+import android.util.Log
+import com.storyteller_f.fei.service.FeiServer
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.server.application.*
@@ -17,9 +19,13 @@ import io.ktor.utils.io.core.*
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.FileDescriptor
 import java.io.FileInputStream
+import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.util.UUID
 import kotlin.coroutines.CoroutineContext
 
 suspend fun ApplicationCall.respondUri(context: Context, file: Uri, configure: OutgoingContent.() -> Unit = {}) {
@@ -143,4 +149,40 @@ fun FileDescriptor.readChannel(
             }
         }
     }.channel
+}
+
+suspend fun Context.saveFile(extension: String?, uri: Uri) {
+    try {
+        withContext(Dispatchers.IO) {
+            val file = File(filesDir, "saved/file-${UUID.randomUUID()}.$extension")
+            val parentFile = file.parentFile!!
+            if (!parentFile.exists()) {
+                parentFile.mkdirs()
+            }
+            if (file.createNewFile()) {
+                uri.writeToFile(file, this@saveFile)
+            } else {
+                Log.e("Server", "create file failed ${file.absolutePath}")
+            }
+
+        }
+    } catch (e: Exception) {
+        Log.e("Server", "saveFile: ", e)
+    }
+
+}
+
+fun Uri.writeToFile(file: File, context: Context) {
+    file.outputStream().channel.use { oChannel ->
+        context.contentResolver.openFileDescriptor(this, "r")?.use { parcelFileDescriptor ->
+            FileInputStream(parcelFileDescriptor.fileDescriptor).channel.use { iChannel ->
+                val byteBuffer = ByteBuffer.allocateDirect(1024)
+                while (iChannel.read(byteBuffer) != -1) {
+                    byteBuffer.flip()
+                    oChannel.write(byteBuffer)
+                    byteBuffer.clear()
+                }
+            }
+        }
+    }
 }

@@ -1,4 +1,4 @@
-package com.storyteller_f.fei
+package com.storyteller_f.fei.service
 
 import io.ktor.server.application.*
 import io.ktor.server.routing.*

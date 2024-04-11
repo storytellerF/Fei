@@ -91,7 +91,6 @@ import com.storyteller_f.fei.ui.components.SharedFile
 import com.storyteller_f.fei.ui.components.ShowQrCode
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.ObsoleteCoroutinesApi
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.concurrent.thread
@@ -170,7 +169,7 @@ class MainActivity : ComponentActivity() {
                 val session = newSession
                 if (session != null) builder.setSession(session)
                 val customTabsIntent = builder.build()
-                customTabsIntent.launchUrl(current, Uri.parse(projectUrl))
+                customTabsIntent.launchUrl(current, Uri.parse(PROJECT_URL))
             }
 
             FeiTheme {
@@ -330,7 +329,6 @@ class MainActivity : ComponentActivity() {
         fei?.saveToLocal(uri, it)
     }
 
-    @OptIn(ObsoleteCoroutinesApi::class)
     private fun deleteItem(path: SharedFileInfo) {
         val uri = Uri.parse(path.uri)
         lifecycleScope.launch {
@@ -340,7 +338,7 @@ class MainActivity : ComponentActivity() {
                 removeUri(path)
             }
             cacheInvalid()//when delete
-            serverChannel?.trySend(SseEvent(data = "refresh"))
+            serverChannel?.emit(SseEvent(data = "refresh"))
         }
     }
 
@@ -414,15 +412,13 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    @OptIn(ObsoleteCoroutinesApi::class)
     private suspend fun saveUri(uri: Uri) {
         savedUriFile.appendText(uri.toString())
         cacheInvalid()//when save
-        serverChannel?.send(SseEvent("refresh"))
+        serverChannel?.emit(SseEvent("refresh"))
     }
 
-    @OptIn(ObsoleteCoroutinesApi::class)
-    private val serverChannel get() = fei?.feiService?.server?.channel
+    private val serverChannel get() = fei?.feiService?.server?.sseChannel
 
     var fei: FeiService.Fei? = null
     private val feiServiceConnection = object : ServiceConnection {
@@ -462,7 +458,7 @@ class MainActivity : ComponentActivity() {
 
                     })
                     newSession?.mayLaunchUrl(
-                        Uri.parse(projectUrl),
+                        Uri.parse(PROJECT_URL),
                         null,
                         null
                     )
@@ -483,7 +479,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
-        const val projectUrl = "https://github.com/storytellerF/Fei"
+        const val PROJECT_URL = "https://github.com/storytellerF/Fei"
     }
 }
 
