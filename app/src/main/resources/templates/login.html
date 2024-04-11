@@ -9,7 +9,49 @@
     <style>
         form {
             text-align: center;
-            margin-top: 200px;
+
+            padding: 40px;
+            background-color: gray;
+            border-radius: 10px;
+            width: 200px;
+            margin: auto;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .button {
+            background-color: white;
+            border: none;
+            color: black;
+            padding: 10px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+        }
+
+        .input{
+            outline-style: none ;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            padding: 6px;
+            font-size: 15px;
+            font-family: "Microsoft soft";
+        }
+        .input:focus{
+            border-color: #66afe9;
+            outline: 0;
+            -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.075),0 0 8px rgba(102,175,233,.6);
+            box-shadow: inset 0 1px 1px rgba(0,0,0,.075),0 0 8px rgba(102,175,233,.6)
         }
 
     </style>
@@ -17,8 +59,8 @@
 <body>
 <form method="post" action="/login">
     <input name="user" type="hidden" value="hidden">
-    <input name="password">
-    <input type="submit">
+    <input name="password" class="input">
+    <input type="submit" class="button">
 </form>
 </body>
 </html>
