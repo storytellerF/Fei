@@ -8,8 +8,6 @@
     <title>login</title>
     <style>
         form {
-            text-align: center;
-
             padding: 40px;
             background-color: gray;
             border-radius: 10px;
@@ -32,7 +30,7 @@
             text-align: center;
             text-decoration: none;
             display: inline-block;
-            font-size: 16px;
+            font-size: 12px;
             margin: 4px 2px;
             cursor: pointer;
             border-radius: 5px;
@@ -59,8 +57,10 @@
 <body>
 <form method="post" action="/login">
     <input name="user" type="hidden" value="hidden">
+    <label>password: </label>
     <input name="password" class="input">
-    <input type="submit" class="button">
+    <input type="submit" class="button" style='margin-top: 20px'>
+    <input type="submit" value="我没有设置密码" class="button">
 </form>
 </body>
 </html>
