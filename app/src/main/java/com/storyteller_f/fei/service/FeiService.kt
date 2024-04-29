@@ -12,7 +12,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.storyteller_f.fei.R
+import com.storyteller_f.fei.cacheInvalid
 import com.storyteller_f.fei.dataStore
+import com.storyteller_f.fei.removeUri
+import com.storyteller_f.fei.saveFile
 import io.ktor.http.CacheControl
 import io.ktor.http.ContentType
 import io.ktor.server.application.ApplicationCall
@@ -24,10 +27,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.io.File
 
 val Context.portFlow
     get() = dataStore.data.map {
@@ -38,6 +44,8 @@ class FeiService : Service() {
     private val job = Job()
     val scope = CoroutineScope(Dispatchers.IO + job)
     val server = FeiServer(this)
+    private val specialEventPort = MutableStateFlow<Int?>(null)
+
     override fun onBind(intent: Intent): IBinder {
         Log.d(TAG, "onBind() called with: intent = $intent")
         return Fei(this)
@@ -64,11 +72,18 @@ class FeiService : Service() {
         val managerCompat = NotificationManagerCompat.from(this)
         if (managerCompat.getNotificationChannel(channelId) == null)
             managerCompat.createNotificationChannel(channel)
+
         scope.launch {
-            portFlow.distinctUntilChanged().collectLatest {
+            combine(portFlow, specialEventPort) { port, eventPort ->
+                eventPort ?: port
+            }.collect {
                 Log.i(TAG, "onCreate: port $it")
-                server.port = it
-                server.restartAsync()
+                server.onReceiveEventPort(it)
+            }
+        }
+        scope.launch {
+            server.state.filterIsInstance<ServerState.Error>().collectLatest {
+                postNotify(it.cause.message ?: "error: ${it.cause::class.qualifiedName}")
             }
         }
 
@@ -84,14 +99,14 @@ class FeiService : Service() {
         }
     }
 
-    fun postNotify(message: String) {
+    private fun postNotify(message: String) {
         postNotify(NotificationManagerCompat.from(this), message)
     }
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy() called")
         super.onDestroy()
-        server.stopAsync()
+        server.stopBlocking()
         scope.cancel()
     }
 
@@ -99,21 +114,44 @@ class FeiService : Service() {
         postNotify("已同意权限")
     }
 
+    fun saveToLocal(uri: Uri, info: SharedFileInfo) {
+        scope.launch {
+            saveFile(File(info.name).extension, uri)
+            removeUri(info)
+            cacheInvalid()//when save to local
+            server.emitRefreshEvent()
+        }
+    }
+
+    fun sendMessage(message: String) {
+        scope.launch {
+            server.sendMessage(message)
+        }
+    }
+
+    fun restart() {
+        specialEventPort.value = SPECIAL_PORT_RESTART
+    }
+
+    fun stop() {
+        specialEventPort.value = SPECIAL_PORT_STOP
+    }
+
     class Fei(val feiService: FeiService) : Binder() {
         fun sendMessage(it: String) {
-            feiService.server.sendMessage(it)
+            feiService.sendMessage(it)
         }
 
-        fun saveToLocal(uri: Uri?, it: SharedFileInfo) {
-            feiService.server.saveToLocal(uri, it)
+        fun saveToLocal(uri: Uri, it: SharedFileInfo) {
+            feiService.saveToLocal(uri, it)
         }
 
         fun restart() {
-            feiService.server.restart()
+            feiService.restart()
         }
 
         fun stop() {
-            feiService.server.stop()
+            feiService.stop()
         }
 
     }
@@ -125,6 +163,10 @@ class FeiService : Service() {
         const val DEFAULT_PORT = 8080
         const val LISTENER_ADDRESS = "0.0.0.0"
         const val DEFAULT_ADDRESS = "127.0.0.1"
+
+        const val VALID_PORT = 1_000
+        const val SPECIAL_PORT_STOP = -1
+        const val SPECIAL_PORT_RESTART = -2
     }
 }
 

@@ -1,11 +1,6 @@
 package com.storyteller_f.fei.service
 
-import android.net.Uri
 import android.util.Log
-import android.widget.Toast
-import com.storyteller_f.fei.cacheInvalid
-import com.storyteller_f.fei.removeUri
-import com.storyteller_f.fei.saveFile
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
@@ -17,47 +12,74 @@ import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.websocket.close
 import io.ktor.websocket.send
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import java.io.File
+
+sealed interface ServerState {
+    object Init : ServerState
+    class Started(
+        val port: Int,
+        val server: ApplicationEngine,
+        val chatSession: DefaultClientWebSocketSession,
+        val client: HttpClient,
+        val channel: MutableSharedFlow<SseEvent>,
+        val messageList: MutableStateFlow<List<Message>>,
+    ) : ServerState
+
+    data class Stopped(val reason: String) : ServerState
+
+    data class Error(val cause: Throwable) : ServerState {
+        constructor(message: String) : this(java.lang.Exception(message))
+    }
+}
 
 class FeiServer(feiService: FeiService) {
     private val scope = feiService.scope
     private val context = feiService
-    private var server: ApplicationEngine? = null
-    var sseChannel: MutableSharedFlow<SseEvent>? = null
+    val state = MutableStateFlow<ServerState>(ServerState.Init)
 
-    /**
-     * 本地也会作为一个webSocket 客户端连接
-     */
-    private var selfClient: HttpClient? = null
-    private var selfSession: DefaultClientWebSocketSession? = null
-    var port = FeiService.DEFAULT_PORT
-    val messagesCache = MutableStateFlow(listOf<Message>())
+    val messagesCache get() = (state.value as? ServerState.Started)?.messageList?.asStateFlow()
 
-    private fun startInternal() {
+    private suspend fun startInternal(port: Int) {
         Log.d(TAG, "startInternal() called")
         try {
-            server = embeddedServer(Netty, port = port, host = FeiService.LISTENER_ADDRESS) {
-                plugPlugins(context)
-                sseChannel = setupSse()
-                configureRouting(context)
-                webSocketsService()
-            }.start(wait = false)
-            Log.i(TAG, "startInternal: $server")
-            selfClient = setupSelfClient()
-            context.postNotify("running on $port")
+            val (server, channel) = setupServer(port)
+            val (setupSelfClient, session) = setupSelfClient(port)
+            state.value = ServerState.Started(
+                port,
+                server,
+                session.first,
+                setupSelfClient,
+                channel,
+                session.second
+            )
         } catch (th: Throwable) {
             Log.e(TAG, "startInternal: ${th.localizedMessage}", th)
+            emitErrorState(th)
         }
     }
 
-    private fun setupSelfClient(): HttpClient {
+    private suspend fun setupServer(port: Int): Pair<NettyApplicationEngine, MutableSharedFlow<SseEvent>> {
+        val channelWaitWorker = CompletableDeferred<MutableSharedFlow<SseEvent>>()
+        val start = embeddedServer(Netty, port = port, host = FeiService.LISTENER_ADDRESS) {
+            plugPlugins(context)
+            channelWaitWorker.complete(setupSse())
+            configureRouting(context)
+            webSocketsService()
+        }.start(wait = false)
+        return start to channelWaitWorker.await()
+    }
+
+    private suspend fun setupSelfClient(port: Int): Pair<HttpClient, Pair<DefaultClientWebSocketSession, MutableStateFlow<List<Message>>>> {
         val httpClient = HttpClient(CIO) {
             install(WebSockets) {
                 pingInterval = 20_000
@@ -65,6 +87,8 @@ class FeiServer(feiService: FeiService) {
             }
         }
 
+        val messagesCache = MutableStateFlow<List<Message>>(emptyList())
+        val sessionWaitWorker = CompletableDeferred<DefaultClientWebSocketSession>()
         scope.launch {
             httpClient.webSocket(
                 method = HttpMethod.Get,
@@ -72,7 +96,7 @@ class FeiServer(feiService: FeiService) {
                 port = port,
                 path = "/chat"
             ) {
-                selfSession = this
+                sessionWaitWorker.complete(this)
                 try {
                     while (true) {
                         val receiveDeserialized = receiveDeserialized<Message>()
@@ -81,64 +105,121 @@ class FeiServer(feiService: FeiService) {
                 } catch (e: Exception) {
                     Log.e(TAG, "startInternal: self webSocket", e)
                 }
-                selfSession = null
             }
             Log.i(TAG, "startInternal: self webSocket end")
         }
-        return httpClient
-    }
-
-    fun stop() {
-        scope.launch {
-            stopInternal()
-        }
+        return httpClient to (sessionWaitWorker.await() to messagesCache)
     }
 
     private suspend fun stopInternal() {
         Log.d(TAG, "stopInternal() called")
-        context.postNotify("stopped")
-        selfSession?.close()
-        selfSession = null
-        selfClient?.close()
-        selfClient = null
-        server?.stop()
-        server = null
-        sseChannel = null
-    }
-
-    fun restart() {
-        scope.launch {
-            restartAsync()
+        val serverState = state.value
+        if (serverState is ServerState.Started) {
+            serverState.chatSession.close()
+            serverState.client.close()
+            serverState.server.stop()
         }
-        Toast.makeText(context, "restarted", Toast.LENGTH_SHORT).show()
     }
 
-    suspend fun restartAsync() {
-        stopInternal()
-        startInternal()
+
+    private suspend fun stopIfNeed() {
+        when (state.value) {
+            is ServerState.Started -> {
+                stopInternal()
+            }
+
+            is ServerState.Init -> {
+                return
+            }
+
+            is ServerState.Error -> {
+                return
+            }
+
+            is ServerState.Stopped -> {
+                return
+            }
+        }
     }
 
-    fun stopAsync() {
+    private suspend fun startIfNeed(port: Int) {
+        when (val current = state.value) {
+            is ServerState.Started -> {
+                if (current.port == port) {
+                    return
+                } else {
+                    stopInternal()
+                    startInternal(port)
+                }
+            }
+
+            is ServerState.Init -> {
+                startInternal(port)
+            }
+
+            is ServerState.Error -> {
+                startInternal(port)
+            }
+
+            is ServerState.Stopped -> {
+                startInternal(port)
+            }
+        }
+    }
+
+    private fun emitErrorState(cause: Throwable) {
+        state.value = ServerState.Error(cause)
+    }
+
+    suspend fun onReceiveEventPort(port: Int) {
+        when {
+            port > FeiService.VALID_PORT -> {
+                //start server
+                startIfNeed(port)
+            }
+
+            port == FeiService.SPECIAL_PORT_STOP -> {
+                //stop server
+                stopIfNeed()
+            }
+
+            port == FeiService.SPECIAL_PORT_RESTART -> {
+                stopIfNeed()
+                startIfNeed(port)
+            }
+
+            else -> {
+                stopIfNeed()
+                val cause = IllegalAccessException("invalid port $port")
+                emitErrorState(cause)
+            }
+        }
+
+    }
+
+
+    fun stopBlocking() {
         runBlocking {
             stopInternal()
         }
     }
 
-    fun saveToLocal(uri: Uri?, info: SharedFileInfo) {
-        uri ?: return
-        scope.launch {
-            context.saveFile(File(info.name).extension, uri)
-            context.removeUri(info)
-            context.cacheInvalid()//when save to local
-            sseChannel?.emit(SseEvent("refresh"))
+    suspend fun sendMessage(content: String) {
+        val serverState = state.value
+        if (serverState is ServerState.Started) {
+            val session = serverState.chatSession
+            session.send(content)
         }
     }
 
-    fun sendMessage(content: String) {
-        scope.launch {
-            selfSession?.send(content)
+    suspend fun emitRefreshEvent() {
+        val serverState = state.value
+        if (serverState is ServerState.Started) {
+            val channel = serverState.channel
+            channel.emit(SseEvent("refresh"))
         }
     }
+
 
     companion object {
         private const val TAG = "FeiServer"

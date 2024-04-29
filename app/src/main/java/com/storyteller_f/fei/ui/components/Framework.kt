@@ -27,8 +27,10 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -47,6 +49,9 @@ import com.jamal.composeprefs3.ui.prefs.EditTextPref
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.dataStore
 import com.storyteller_f.fei.service.FeiService
+import com.storyteller_f.fei.service.ServerState
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @Preview
 @Composable
@@ -58,8 +63,13 @@ fun FeiMainToolbar(
     sendText: (String) -> Unit = {},
     openDrawer: () -> Unit = {},
     deleteAll: () -> Unit = {},
+    stateFlow: Flow<ServerState> = MutableStateFlow(ServerState.Error("TEST")),
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
+    var errorDialogContent by remember {
+        mutableStateOf("")
+    }
+    val state by stateFlow.collectAsState(initial = ServerState.Init)
 
     TopAppBar(
         title = {
@@ -68,15 +78,21 @@ fun FeiMainToolbar(
                 Text(
                     text = port,
                     fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = if (state is ServerState.Error) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
                         .padding(8.dp)
                         .background(
-                            MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp)
+                            if (state is ServerState.Error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            RoundedCornerShape(8.dp)
                         )
                         .padding(8.dp, 2.dp)
                         .clickable {
-                            showDialog = true
+                            val currentState = state
+                            if (currentState is ServerState.Error) {
+                                errorDialogContent = currentState.cause.stackTraceToString()
+                            } else {
+                                showDialog = true
+                            }
                         }
                 )
             }
@@ -138,6 +154,15 @@ fun FeiMainToolbar(
                 usePlatformDefaultWidth = false
             ),
         )
+    if (errorDialogContent.isNotEmpty()) {
+        AlertDialog(onDismissRequest = { errorDialogContent = "" }, confirmButton = {
+            Text(text = "Close", modifier = Modifier.clickable {
+                errorDialogContent = ""
+            })
+        }, text = {
+            Text(text = errorDialogContent)
+        })
+    }
 }
 
 @Preview
@@ -160,7 +185,6 @@ fun SettingPage(port: String = FeiService.DEFAULT_PORT.toString()) {
 
 @Preview
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun NavDrawer(
     closeDrawer: () -> Unit = {},
     navigateTo: (String) -> Unit = {},

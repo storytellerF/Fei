@@ -21,6 +21,7 @@ navigation-compose = "2.7.5"
 slf4j-android = "1.7.36"
 ui = "1.5.4"
 webkit = "1.9.0"
+rules = "1.5.0"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
@@ -66,6 +67,7 @@ ktor-server-thymeleaf = { module = "io.ktor:ktor-server-thymeleaf", version.ref 
 ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor-server-core" }
 leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary-android" }
 slf4j-android = { module = "org.slf4j:slf4j-android", version.ref = "slf4j-android" }
+androidx-rules = { group = "androidx.test", name = "rules", version.ref = "rules" }
 
 [bundles]
 coruntines = ["kotlinx-coroutines-android", "kotlinx-coroutines-core"]

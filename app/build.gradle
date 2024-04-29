@@ -69,6 +69,7 @@ dependencies {
 
     implementation libs.androidx.ui
     implementation libs.androidx.ui.tooling.preview
+    implementation libs.androidx.rules
     androidTestImplementation libs.androidx.ui.test.junit4
     debugImplementation libs.androidx.ui.tooling
     debugImplementation libs.androidx.ui.test.manifest
@@ -110,7 +111,7 @@ dependencies {
     if (baoFolder == "local" && baoModule != null)
         implementation(baoModule)
     else
-        implementation("com.github.storytellerF.Bao:startup:2.3.0")
+        implementation("com.github.storytellerF.Bao:startup:e978cf52f2")
 
     def yongFolder = project.ext.yongFolder
     def yongModule = findProject(":yong:library")

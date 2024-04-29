@@ -76,8 +76,9 @@ import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
 import com.google.accompanist.permissions.shouldShowRationale
 import com.storyteller_f.fei.service.FeiService
+import com.storyteller_f.fei.service.Message
+import com.storyteller_f.fei.service.ServerState
 import com.storyteller_f.fei.service.SharedFileInfo
-import com.storyteller_f.fei.service.SseEvent
 import com.storyteller_f.fei.service.portFlow
 import com.storyteller_f.fei.ui.components.ComposeBluetoothDevice
 import com.storyteller_f.fei.ui.components.FeiMainToolbar
@@ -91,6 +92,9 @@ import com.storyteller_f.fei.ui.components.SharedFile
 import com.storyteller_f.fei.ui.components.ShowQrCode
 import com.storyteller_f.fei.ui.theme.FeiTheme
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.concurrent.thread
@@ -129,7 +133,7 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            fei?.feiService?.onUserGrantNotificationPermission()
+            currentFeiBinder()?.feiService?.onUserGrantNotificationPermission()
         }
     }
 
@@ -148,9 +152,8 @@ class MainActivity : ComponentActivity() {
             val navController = rememberNavController()
             val scope = rememberCoroutineScope()
             val snackBarHostState = remember { SnackbarHostState() }
-            val infoList by shares.collectAsState()
             val density = LocalDensity.current
-            val current = LocalContext.current
+            val context = LocalContext.current
             val configuration = LocalConfiguration.current
             val screenHeight = with(density) { configuration.screenHeightDp.dp.roundToPx() }
             val currentBackStackEntryAsState by navController.currentBackStackEntryAsState()
@@ -158,7 +161,7 @@ class MainActivity : ComponentActivity() {
             val sendText: (String) -> Unit = {
                 scope.launch {
                     if (!bf.sendText(it)) {
-                        Toast.makeText(current, "未连接到任何设备", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "未连接到任何设备", Toast.LENGTH_SHORT).show()
                         navController.navigate("hid")
                     }
                 }
@@ -169,7 +172,7 @@ class MainActivity : ComponentActivity() {
                 val session = newSession
                 if (session != null) builder.setSession(session)
                 val customTabsIntent = builder.build()
-                customTabsIntent.launchUrl(current, Uri.parse(PROJECT_URL))
+                customTabsIntent.launchUrl(context, Uri.parse(PROJECT_URL))
             }
 
             FeiTheme {
@@ -183,7 +186,7 @@ class MainActivity : ComponentActivity() {
                     }, snackbarHost = {
                         SnackbarHost(hostState = snackBarHostState) { }
                     }) { paddingValues ->
-                        MainContent(paddingValues, navController, infoList, port, sendText, state)
+                        MainContent(paddingValues, navController, port, sendText, state)
                     }
                 }
 
@@ -195,7 +198,7 @@ class MainActivity : ComponentActivity() {
         }
         val intent = Intent(this, FeiService::class.java)
         startService(intent)
-        if (fei == null) bindService(intent, feiServiceConnection, 0)
+        if (currentFeiBinder() == null) bindService(intent, feiServiceConnection, 0)
         CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
 
     }
@@ -233,11 +236,11 @@ class MainActivity : ComponentActivity() {
     private fun MainContent(
         paddingValues: PaddingValues,
         navController: NavHostController,
-        infoList: List<SharedFileInfo>,
         port: Int,
         sendText: (String) -> Unit,
         state: HidState
     ) {
+        val infoList by shares.collectAsState()
         Surface(
             modifier = Modifier
                 .fillMaxSize()
@@ -292,6 +295,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Composable
     private fun TopBar(
         port: Int,
@@ -299,10 +303,13 @@ class MainActivity : ComponentActivity() {
         scope: CoroutineScope,
         drawerState: DrawerState
     ) {
+        val state = fei.flatMapLatest {
+            it?.feiService?.server?.state ?: MutableStateFlow(ServerState.Init)
+        }
         FeiMainToolbar(
             port.toString(),
-            { fei?.restart() },
-            { fei?.stop() },
+            { currentFeiBinder()?.restart() },
+            { currentFeiBinder()?.stop() },
             sendText,
             {
                 scope.launch {
@@ -311,7 +318,8 @@ class MainActivity : ComponentActivity() {
             },
             {
                 shares.value.forEach(::deleteItem)
-            }
+            },
+            state
         )
     }
 
@@ -326,7 +334,7 @@ class MainActivity : ComponentActivity() {
     private fun saveToLocal(it: SharedFileInfo) {
         val uri = Uri.parse(it.uri)
         assert(uri.scheme != "file")
-        fei?.saveToLocal(uri, it)
+        currentFeiBinder()?.saveToLocal(uri, it)
     }
 
     private fun deleteItem(path: SharedFileInfo) {
@@ -338,7 +346,7 @@ class MainActivity : ComponentActivity() {
                 removeUri(path)
             }
             cacheInvalid()//when delete
-            serverChannel?.emit(SseEvent(data = "refresh"))
+            emitRefreshEvent()
         }
     }
 
@@ -388,14 +396,21 @@ class MainActivity : ComponentActivity() {
         unbindService(chromeConnection)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Composable
     fun Messages() {
-        val fei = fei
-        if (fei != null) {
-            val collectAsState by fei.feiService.server.messagesCache.collectAsState()
-            MessagePage(collectAsState) {
-                fei.sendMessage(it)
-            }
+        val messageList by fei.flatMapLatest {
+            it?.feiService?.server?.messagesCache ?: MutableStateFlow(
+                listOf(
+                    Message(
+                        "system",
+                        "Server stopped."
+                    )
+                )
+            )
+        }.collectAsState(initial = emptyList())
+        MessagePage(messageList) {
+            currentFeiBinder()?.sendMessage(it)
         }
     }
 
@@ -415,12 +430,14 @@ class MainActivity : ComponentActivity() {
     private suspend fun saveUri(uri: Uri) {
         savedUriFile.appendText(uri.toString())
         cacheInvalid()//when save
-        serverChannel?.emit(SseEvent("refresh"))
+        emitRefreshEvent()
     }
 
-    private val serverChannel get() = fei?.feiService?.server?.sseChannel
+    private suspend fun emitRefreshEvent() {
+        currentFeiBinder()?.feiService?.server?.emitRefreshEvent()
+    }
 
-    var fei: FeiService.Fei? = null
+    var fei = MutableStateFlow<FeiService.Fei?>(null)
     private val feiServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             Toast.makeText(
@@ -430,11 +447,11 @@ class MainActivity : ComponentActivity() {
             ).show()
             val feiLocal = service as FeiService.Fei
             Log.i(TAG, "onServiceConnected: $feiLocal")
-            fei = feiLocal
+            fei.value = feiLocal
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            fei = null
+            fei.value = null
             Toast.makeText(
                 this@MainActivity,
                 getString(R.string.service_closed),
@@ -442,6 +459,8 @@ class MainActivity : ComponentActivity() {
             ).show()
         }
     }
+
+    private fun currentFeiBinder() = fei.value
 
     private val customTabPackageName = "com.android.chrome" // Change when in stable
     var newSession: CustomTabsSession? = null
