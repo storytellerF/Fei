@@ -16,9 +16,9 @@ kotlinx-coroutines = "1.8.0"
 ktor-server-core = "2.3.9"
 leakcanary-android = "2.12"
 lifecycle-runtime-ktx = "2.7.0"
+logback-android = "3.0.0"
 material3 = "1.2.1"
 navigation-compose = "2.7.7"
-slf4j-android = "1.7.36"
 ui = "1.6.6"
 webkit = "1.10.0"
 rules = "1.5.0"
@@ -45,7 +45,9 @@ androidx-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", versi
 androidx-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "ui" }
 androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
 compose-prefs3 = { module = "com.github.JamalMulla:ComposePrefs3", version.ref = "compose-prefs3" }
-core = { module = "com.google.zxing:core", version.ref = "core" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor-server-core" }
+logback-android = { module = "com.github.tony19:logback-android", version.ref = "logback-android" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "core" }
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
@@ -66,7 +68,6 @@ ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", versio
 ktor-server-thymeleaf = { module = "io.ktor:ktor-server-thymeleaf", version.ref = "ktor-server-core" }
 ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor-server-core" }
 leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary-android" }
-slf4j-android = { module = "org.slf4j:slf4j-android", version.ref = "slf4j-android" }
 androidx-rules = { group = "androidx.test", name = "rules", version.ref = "rules" }
 
 [bundles]

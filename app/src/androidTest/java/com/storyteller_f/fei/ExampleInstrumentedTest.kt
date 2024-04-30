@@ -1,21 +1,30 @@
 package com.storyteller_f.fei
 
 import android.content.Intent
-import android.os.IBinder
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.ServiceTestRule
 import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.service.ServerState
+import com.storyteller_f.fei.service.SharedFileInfo
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.request.forms.submitForm
+import io.ktor.client.request.get
+import io.ktor.client.request.headers
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
+import io.ktor.http.parameters
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.runBlocking
-
+import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-
-import org.junit.Assert.*
-import org.junit.Rule
+import java.io.File
 
 /**
  * Instrumented test, which will execute on an Android device.
@@ -30,52 +39,91 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testServerStart() {
-        val serviceIntent = Intent(
-            ApplicationProvider.getApplicationContext(),
-            FeiService::class.java
-        )
+        useService { service ->
+            val server = service.server
+            assertTrue(server.state.value is ServerState.Init)
 
-        // Bind the service and grab a reference to the binder.
-        val binder: IBinder = serviceRule.bindService(serviceIntent)
-
-        // Get the reference to the service, or you can call
-        // public methods on the binder directly.
-        val service = (binder as FeiService.Fei).feiService
-
-        val server = service.server
-        assertTrue(server.state.value is ServerState.Init)
-
-        runBlocking {
-            server.onReceiveEventPort(8080)
+            runBlocking {
+                server.onReceiveEventPort(FeiService.DEFAULT_PORT)
+            }
             assertTrue(server.state.value is ServerState.Started)
-            serviceRule.unbindService()
         }
     }
 
     @Test
     fun testConflictPort() {
+        useService { service ->
+            val engine = embeddedServer(
+                Netty,
+                port = FeiService.DEFAULT_PORT,
+                host = FeiService.LISTENER_ADDRESS
+            ) {
+            }.start(wait = false)
+            try {
+                val server = service.server
+                assertTrue(server.state.value is ServerState.Init)
+
+                runBlocking {
+                    server.onReceiveEventPort(FeiService.DEFAULT_PORT)
+                }
+                assertTrue(server.state.value is ServerState.Error)
+            } finally {
+                engine.stop()
+            }
+
+        }
+    }
+
+    @Test
+    fun testLogin() {
+        useClient { httpClient, feiService, cookie ->
+            runBlocking {
+                uriFilePath = File(feiService.filesDir, "list.txt").absolutePath
+                savedUriFile.appendText("file:///test.zip")
+                feiService.cacheInvalid()//when test
+                val response =
+                    httpClient.get("http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/shares") {
+                        headers {
+                            append("cookie", cookie)
+                        }
+                    }
+                assertTrue(response.status.isSuccess())
+                val bodyAsText = response.bodyAsText()
+                assertTrue(bodyAsText.contains("test.zip"))
+            }
+        }
+    }
+
+    private fun useService(block: (FeiService) -> Unit) {
         val serviceIntent = Intent(
             ApplicationProvider.getApplicationContext(),
             FeiService::class.java
         )
-        val engine = embeddedServer(Netty, port = 8080, host = FeiService.LISTENER_ADDRESS) {
-        }.start(wait = false)
-
-        // Bind the service and grab a reference to the binder.
-        val binder: IBinder = serviceRule.bindService(serviceIntent)
-
-        // Get the reference to the service, or you can call
-        // public methods on the binder directly.
-        val service = (binder as FeiService.Fei).feiService
-
-        val server = service.server
-        assertTrue(server.state.value is ServerState.Init)
-
-        runBlocking {
-            server.onReceiveEventPort(8080)
-            assertTrue(server.state.value is ServerState.Error)
+        val binder = serviceRule.bindService(serviceIntent)
+        try {
+            block((binder as FeiService.Fei).feiService)
+        } finally {
             serviceRule.unbindService()
-            engine.stop()
+        }
+    }
+
+    private fun useClient(block: (HttpClient, FeiService, String) -> Unit) {
+        useService { service ->
+            val server = service.server
+            HttpClient(CIO) {
+                install(Logging)
+            }.use {
+                runBlocking {
+                    server.onReceiveEventPort(FeiService.DEFAULT_PORT)
+                    val cookie = it.submitForm(
+                        "http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/login",
+                        formParameters = parameters {
+                            append("user", "hidden")
+                            append("password", "abc")
+                        }).headers["set-cookie"]!!
+                    block(it, service, cookie)
+                }
+            }
         }
     }
 }

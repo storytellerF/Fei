@@ -78,11 +78,21 @@ fun FeiMainToolbar(
                 Text(
                     text = port,
                     fontSize = 10.sp,
-                    color = if (state is ServerState.Error) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary,
+                    color = when (state) {
+                        is ServerState.Error -> MaterialTheme.colorScheme.onError
+                        is ServerState.Stopped -> MaterialTheme.colorScheme.onTertiary
+                        is ServerState.Init -> MaterialTheme.colorScheme.onSecondary
+                        else -> MaterialTheme.colorScheme.onPrimary
+                    },
                     modifier = Modifier
                         .padding(8.dp)
                         .background(
-                            if (state is ServerState.Error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                            when (state) {
+                                is ServerState.Error -> MaterialTheme.colorScheme.error
+                                is ServerState.Stopped -> MaterialTheme.colorScheme.tertiary
+                                is ServerState.Init -> MaterialTheme.colorScheme.surface
+                                else -> MaterialTheme.colorScheme.primary
+                            },
                             RoundedCornerShape(8.dp)
                         )
                         .padding(8.dp, 2.dp)

@@ -437,7 +437,7 @@ class MainActivity : ComponentActivity() {
         currentFeiBinder()?.feiService?.server?.emitRefreshEvent()
     }
 
-    var fei = MutableStateFlow<FeiService.Fei?>(null)
+    val fei = MutableStateFlow<FeiService.Fei?>(null)
     private val feiServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             Toast.makeText(

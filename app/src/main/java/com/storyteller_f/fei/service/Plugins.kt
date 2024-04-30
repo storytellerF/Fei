@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
+import org.slf4j.event.Level
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver
 import java.time.Duration
 
@@ -45,7 +46,9 @@ fun Application.plugPlugins(context: Context) {
             )
         }
     }
-    install(CallLogging)
+    install(CallLogging) {
+        level = Level.DEBUG
+    }
     install(Thymeleaf) {
         setTemplateResolver(ClassLoaderTemplateResolver().apply {
             prefix = "templates/"
@@ -97,11 +100,11 @@ fun Application.plugPlugins(context: Context) {
 }
 
 fun Application.setupSse(): MutableSharedFlow<SseEvent> {
-    val shareIn = MutableSharedFlow<SseEvent>()
+    val flow = MutableSharedFlow<SseEvent>()
     routing {
         get("/sse") {
-            call.respondSse(shareIn)
+            call.respondSse(flow)
         }
     }
-    return shareIn
+    return flow
 }
