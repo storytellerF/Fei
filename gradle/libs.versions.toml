@@ -4,7 +4,7 @@ activity-compose = "1.9.0"
 androidx-core-ktx = "1.13.0"
 androidx-junit = "1.1.5"
 browser = "1.8.0"
-compose-prefs3 = "1.0.4"
+compose-prefs3 = "1.0.5"
 core = "3.5.1"
 core-splashscreen = "1.0.1"
 customview-poolingcontainer = "1.0.0"
@@ -78,4 +78,4 @@ ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-auth",
     "ktor-server-html-builder", "ktor-server-partial-content",
     "ktor-server-sessions", "ktor-server-status-pages",
     "ktor-server-thymeleaf", "ktor-server-websockets", "ktor-serialization-kotlinx-json"]
-ktor-client = ["ktor-client-cio", "ktor-client-websockets"]
+ktor-client = ["ktor-client-cio", "ktor-client-websockets", "ktor-client-logging"]

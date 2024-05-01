@@ -90,8 +90,6 @@ dependencies {
     //ktor
     implementation(libs.bundles.ktor.server)
     implementation(libs.bundles.ktor.client)
-    implementation(libs.ktor.client.logging)
-
 
     implementation(libs.bundles.coruntines)
 
@@ -99,7 +97,7 @@ dependencies {
     implementation libs.logback.android
     implementation libs.zxing.core
 
-    implementation libs.compose.prefs3 // Current is 1.0.3
+    implementation libs.compose.prefs3
     implementation libs.androidx.datastore.preferences
 
     implementation(libs.androidx.webkit)

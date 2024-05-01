@@ -103,9 +103,9 @@ import kotlin.concurrent.thread
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 sealed class HidState {
-    object NotSupport : HidState()
-    object BluetoothOff : HidState()
-    object NoPermission : HidState()
+    data object NotSupport : HidState()
+    data object BluetoothOff : HidState()
+    data object NoPermission : HidState()
     class NoBond(val bondDevices: List<ComposeBluetoothDevice>, val connecting: String? = null) :
         HidState()
 
@@ -129,12 +129,30 @@ class MainActivity : ComponentActivity() {
             NoOpBluetoothFei()
         }
     }
+    val fei = MutableStateFlow<FeiService.Fei?>(null)
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
             currentFeiBinder()?.feiService?.onUserGrantNotificationPermission()
         }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val feiServerState = fei.flatMapLatest {
+        it?.feiService?.server?.state ?: MutableStateFlow(ServerState.Init)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val messageFlow = fei.flatMapLatest {
+        it?.feiService?.server?.messagesCache ?: MutableStateFlow(
+            listOf(
+                Message(
+                    "system",
+                    "Server stopped."
+                )
+            )
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -295,7 +313,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Composable
     private fun TopBar(
         port: Int,
@@ -303,9 +320,6 @@ class MainActivity : ComponentActivity() {
         scope: CoroutineScope,
         drawerState: DrawerState
     ) {
-        val state = fei.flatMapLatest {
-            it?.feiService?.server?.state ?: MutableStateFlow(ServerState.Init)
-        }
         FeiMainToolbar(
             port.toString(),
             { currentFeiBinder()?.restart() },
@@ -319,7 +333,7 @@ class MainActivity : ComponentActivity() {
             {
                 shares.value.forEach(::deleteItem)
             },
-            state
+            feiServerState
         )
     }
 
@@ -396,19 +410,9 @@ class MainActivity : ComponentActivity() {
         unbindService(chromeConnection)
     }
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Composable
     fun Messages() {
-        val messageList by fei.flatMapLatest {
-            it?.feiService?.server?.messagesCache ?: MutableStateFlow(
-                listOf(
-                    Message(
-                        "system",
-                        "Server stopped."
-                    )
-                )
-            )
-        }.collectAsState(initial = emptyList())
+        val messageList by messageFlow.collectAsState(initial = emptyList())
         MessagePage(messageList) {
             currentFeiBinder()?.sendMessage(it)
         }
@@ -437,7 +441,6 @@ class MainActivity : ComponentActivity() {
         currentFeiBinder()?.feiService?.server?.emitRefreshEvent()
     }
 
-    val fei = MutableStateFlow<FeiService.Fei?>(null)
     private val feiServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             Toast.makeText(
