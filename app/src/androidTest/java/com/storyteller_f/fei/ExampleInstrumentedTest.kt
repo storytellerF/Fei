@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.ServiceTestRule
+import com.storyteller_f.fei.service.FeiServer
 import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.service.ServerState
 import com.storyteller_f.fei.service.specialEvent
@@ -39,8 +40,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testServerStart() {
-        useService { service ->
-            val server = service.server
+        useService { _, server ->
             runBlocking {
                 server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
             }
@@ -50,8 +50,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testServerStop() {
-        useService { service ->
-            val server = service.server
+        useService { _, server ->
             runBlocking {
                 server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
                 assertTrue(server.state.value is ServerState.Started)
@@ -63,8 +62,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testServerRestart() {
-        useService { service ->
-            val server = service.server
+        useService { _, server ->
             runBlocking {
                 server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
                 val preStartedTime = (server.state.value as ServerState.Started).time
@@ -76,21 +74,12 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testConflictPort() {
-        useService { service ->
-            val engine = embeddedServer(
-                Netty,
-                port = FeiService.DEFAULT_PORT,
-                host = FeiService.LISTENER_ADDRESS
-            ) {
-            }.start(wait = false)
-            try {
-                val server = service.server
+        useService { _, server ->
+            otherServer {
                 runBlocking {
                     server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
                 }
                 assertTrue(server.state.value is ServerState.Error)
-            } finally {
-                engine.stop()
             }
 
         }
@@ -116,7 +105,7 @@ class ExampleInstrumentedTest {
         }
     }
 
-    private fun useService(block: (FeiService) -> Unit) {
+    private fun useService(block: (FeiService, FeiServer) -> Unit) {
         val serviceIntent = Intent(
             ApplicationProvider.getApplicationContext(),
             FeiService::class.java
@@ -124,19 +113,20 @@ class ExampleInstrumentedTest {
         specialEvent.value = FeiService.EVENT_OFF
         try {
             val binder = serviceRule.bindService(serviceIntent)
-            block((binder as FeiService.Fei).feiService)
+            val feiService = (binder as FeiService.Fei).feiService
+            block(feiService, feiService.server)
         } finally {
             serviceRule.unbindService()
         }
     }
 
     private fun useClient(block: (HttpClient, FeiService, String) -> Unit) {
-        useService { service ->
+        useService { service, server ->
             HttpClient(CIO) {
                 install(Logging)
             }.use {
                 runBlocking {
-                    service.server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
+                    server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
                     val cookie = it.submitForm(
                         "http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/login",
                         formParameters = parameters {
@@ -146,6 +136,20 @@ class ExampleInstrumentedTest {
                     block(it, service, cookie)
                 }
             }
+        }
+    }
+
+    private fun otherServer(block: () -> Unit) {
+        val engine = embeddedServer(
+            Netty,
+            port = FeiService.DEFAULT_PORT,
+            host = FeiService.LISTENER_ADDRESS
+        ) {
+        }.start(wait = false)
+        try {
+            block()
+        } finally {
+            engine.stop()
         }
     }
 
