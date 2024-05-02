@@ -11,6 +11,8 @@ import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.cacheInvalid
 import com.storyteller_f.fei.dataStore
@@ -40,11 +42,12 @@ val Context.portFlow
         it[stringPreferencesKey("port")]?.toInt() ?: FeiService.DEFAULT_PORT
     }
 
+val specialEvent = MutableStateFlow<Int?>(null)
+
 class FeiService : Service() {
     private val job = Job()
     val scope = CoroutineScope(Dispatchers.IO + job)
     val server = FeiServer(this)
-    private val specialEventPort = MutableStateFlow<Int?>(null)
 
     override fun onBind(intent: Intent): IBinder {
         Log.d(TAG, "onBind() called with: intent = $intent")
@@ -74,11 +77,11 @@ class FeiService : Service() {
             managerCompat.createNotificationChannel(channel)
 
         scope.launch {
-            combine(portFlow, specialEventPort) { port, eventPort ->
-                eventPort ?: port
-            }.collect {
-                Log.i(TAG, "onCreate: port $it")
-                server.onReceiveEventPort(it)
+            combine(portFlow, specialEvent) { port, eventPort ->
+                eventPort to port
+            }.collect { (event, port) ->
+                Log.i(TAG, "onCreate: port $event $port")
+                server.onReceiveEventPort(port, event)
             }
         }
         scope.launch {
@@ -130,11 +133,11 @@ class FeiService : Service() {
     }
 
     fun restart() {
-        specialEventPort.value = SPECIAL_PORT_RESTART
+        specialEvent.value = EVENT_RESTART
     }
 
     fun stop() {
-        specialEventPort.value = SPECIAL_PORT_STOP
+        specialEvent.value = EVENT_STOP
     }
 
     class Fei(val feiService: FeiService) : Binder() {
@@ -165,8 +168,9 @@ class FeiService : Service() {
         const val DEFAULT_ADDRESS = "127.0.0.1"
 
         const val VALID_PORT = 1_000
-        const val SPECIAL_PORT_STOP = -1
-        const val SPECIAL_PORT_RESTART = -2
+        const val EVENT_STOP = -1
+        const val EVENT_RESTART = -2
+        const val EVENT_OFF = -3
     }
 }
 

@@ -6,9 +6,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.ServiceTestRule
 import com.storyteller_f.fei.service.FeiService
 import com.storyteller_f.fei.service.ServerState
-import com.storyteller_f.fei.service.SharedFileInfo
+import com.storyteller_f.fei.service.specialEvent
 import io.ktor.client.HttpClient
-import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.forms.submitForm
@@ -20,6 +19,7 @@ import io.ktor.http.parameters
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -41,12 +41,36 @@ class ExampleInstrumentedTest {
     fun testServerStart() {
         useService { service ->
             val server = service.server
-            assertTrue(server.state.value is ServerState.Init)
-
             runBlocking {
-                server.onReceiveEventPort(FeiService.DEFAULT_PORT)
+                server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
             }
             assertTrue(server.state.value is ServerState.Started)
+        }
+    }
+
+    @Test
+    fun testServerStop() {
+        useService { service ->
+            val server = service.server
+            runBlocking {
+                server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
+                assertTrue(server.state.value is ServerState.Started)
+                server.onReceiveEventPort(0, FeiService.EVENT_STOP)
+                assertTrue(server.state.value is ServerState.Stopped)
+            }
+        }
+    }
+
+    @Test
+    fun testServerRestart() {
+        useService { service ->
+            val server = service.server
+            runBlocking {
+                server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
+                val preStartedTime = (server.state.value as ServerState.Started).time
+                server.onReceiveEventPort(FeiService.DEFAULT_PORT, FeiService.EVENT_RESTART)
+                assertNotEquals(preStartedTime, (server.state.value as ServerState.Started).time)
+            }
         }
     }
 
@@ -61,10 +85,8 @@ class ExampleInstrumentedTest {
             }.start(wait = false)
             try {
                 val server = service.server
-                assertTrue(server.state.value is ServerState.Init)
-
                 runBlocking {
-                    server.onReceiveEventPort(FeiService.DEFAULT_PORT)
+                    server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
                 }
                 assertTrue(server.state.value is ServerState.Error)
             } finally {
@@ -99,8 +121,9 @@ class ExampleInstrumentedTest {
             ApplicationProvider.getApplicationContext(),
             FeiService::class.java
         )
-        val binder = serviceRule.bindService(serviceIntent)
+        specialEvent.value = FeiService.EVENT_OFF
         try {
+            val binder = serviceRule.bindService(serviceIntent)
             block((binder as FeiService.Fei).feiService)
         } finally {
             serviceRule.unbindService()
@@ -109,12 +132,11 @@ class ExampleInstrumentedTest {
 
     private fun useClient(block: (HttpClient, FeiService, String) -> Unit) {
         useService { service ->
-            val server = service.server
             HttpClient(CIO) {
                 install(Logging)
             }.use {
                 runBlocking {
-                    server.onReceiveEventPort(FeiService.DEFAULT_PORT)
+                    service.server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
                     val cookie = it.submitForm(
                         "http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/login",
                         formParameters = parameters {
@@ -126,4 +148,5 @@ class ExampleInstrumentedTest {
             }
         }
     }
+
 }

@@ -24,7 +24,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 
 sealed interface ServerState {
-    object Init : ServerState
+    data object Init : ServerState
     class Started(
         val port: Int,
         val server: ApplicationEngine,
@@ -32,6 +32,7 @@ sealed interface ServerState {
         val client: HttpClient,
         val channel: MutableSharedFlow<SseEvent>,
         val messageList: MutableStateFlow<List<Message>>,
+        val time: Long
     ) : ServerState
 
     data class Stopped(val reason: String) : ServerState
@@ -53,14 +54,17 @@ class FeiServer(feiService: FeiService) {
         try {
             val (server, channel) = setupServer(port)
             val (setupSelfClient, session) = setupSelfClient(port)
+            val time = System.currentTimeMillis()
             state.value = ServerState.Started(
                 port,
                 server,
                 session.first,
                 setupSelfClient,
                 channel,
-                session.second
+                session.second,
+                time
             )
+            Log.i(TAG, "startInternal: $time")
         } catch (th: Throwable) {
             Log.e(TAG, "startInternal: ${th.localizedMessage}", th)
             emitErrorState(th)
@@ -110,21 +114,22 @@ class FeiServer(feiService: FeiService) {
         return httpClient to (sessionWaitWorker.await() to messagesCache)
     }
 
-    private suspend fun stopInternal() {
+    private suspend fun stopInternal(cause: String) {
         Log.d(TAG, "stopInternal() called")
         val serverState = state.value
         if (serverState is ServerState.Started) {
             serverState.chatSession.close()
             serverState.client.close()
             serverState.server.stop()
+            state.value = ServerState.Stopped(cause)
         }
     }
 
 
-    private suspend fun stopIfNeed() {
+    private suspend fun stopIfNeed(cause: String) {
         when (state.value) {
             is ServerState.Started -> {
-                stopInternal()
+                stopInternal(cause)
             }
 
             is ServerState.Init -> {
@@ -147,7 +152,7 @@ class FeiServer(feiService: FeiService) {
                 if (current.port == port) {
                     return
                 } else {
-                    stopInternal()
+                    stopInternal("port changed")
                     startInternal(port)
                 }
             }
@@ -170,27 +175,31 @@ class FeiServer(feiService: FeiService) {
         state.value = ServerState.Error(cause)
     }
 
-    suspend fun onReceiveEventPort(port: Int) {
-        when {
-            port > FeiService.VALID_PORT -> {
-                //start server
-                startIfNeed(port)
+    suspend fun onReceiveEventPort(port: Int, event: Int?) {
+        if (event != null) {
+            when (event) {
+                FeiService.EVENT_STOP -> {
+                    //stop server
+                    stopIfNeed("stop event.")
+                }
+                FeiService.EVENT_RESTART -> {
+                    Log.i(TAG, "onReceiveEventPort: restart")
+                    stopIfNeed("restart event.")
+                    startIfNeed(port)
+                }
             }
+        } else {
+            when {
+                port > FeiService.VALID_PORT -> {
+                    //start server
+                    startIfNeed(port)
+                }
 
-            port == FeiService.SPECIAL_PORT_STOP -> {
-                //stop server
-                stopIfNeed()
-            }
-
-            port == FeiService.SPECIAL_PORT_RESTART -> {
-                stopIfNeed()
-                startIfNeed(port)
-            }
-
-            else -> {
-                stopIfNeed()
-                val cause = IllegalAccessException("invalid port $port")
-                emitErrorState(cause)
+                else -> {
+                    stopIfNeed("invalid port")
+                    val cause = IllegalAccessException("invalid port $port")
+                    emitErrorState(cause)
+                }
             }
         }
 
@@ -199,7 +208,7 @@ class FeiServer(feiService: FeiService) {
 
     fun stopBlocking() {
         runBlocking {
-            stopInternal()
+            stopInternal("service stopped")
         }
     }
 
