@@ -2,6 +2,7 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.serialization'
+    id "com.starter.easylauncher" version "6.3.0"
 }
 
 android {
@@ -22,6 +23,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            resValue(
+                    "string",
+                    "leak_canary_display_activity_label",
+                    "Fei"
+            )
+        }
+
         release {
             minifyEnabled true
             shrinkResources true
