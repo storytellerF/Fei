@@ -97,6 +97,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import java.io.File
+import java.lang.ref.WeakReference
 import kotlin.concurrent.thread
 
 
@@ -441,56 +442,13 @@ class MainActivity : ComponentActivity() {
         currentFeiBinder()?.feiService?.server?.emitRefreshEvent()
     }
 
-    private val feiServiceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            Toast.makeText(
-                this@MainActivity,
-                getString(R.string.service_connected),
-                Toast.LENGTH_SHORT
-            ).show()
-            val feiLocal = service as FeiService.Fei
-            Log.i(TAG, "onServiceConnected: $feiLocal")
-            fei.value = feiLocal
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            fei.value = null
-            Toast.makeText(
-                this@MainActivity,
-                getString(R.string.service_closed),
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
+    private val feiServiceConnection by lazy { HidConnection(this) }
 
     private fun currentFeiBinder() = fei.value
 
     private val customTabPackageName = "com.android.chrome" // Change when in stable
     var newSession: CustomTabsSession? = null
-    private val chromeConnection: CustomTabsServiceConnection =
-        object : CustomTabsServiceConnection() {
-            override fun onCustomTabsServiceConnected(
-                name: ComponentName,
-                client: CustomTabsClient
-            ) {
-                thread(name = "warmup chrome tab") {
-                    val warmup = client.warmup(0)
-                    Log.i(TAG, "onCustomTabsServiceConnected: warmup $warmup")
-                    newSession = client.newSession(object : CustomTabsCallback() {
-
-                    })
-                    newSession?.mayLaunchUrl(
-                        Uri.parse(PROJECT_URL),
-                        null,
-                        null
-                    )
-                }
-
-            }
-
-            override fun onServiceDisconnected(name: ComponentName) {}
-        }
-
+    private val chromeConnection by lazy { CustomTabConnection(this) }
 
     override fun onResume() {
         super.onResume()
@@ -503,6 +461,56 @@ class MainActivity : ComponentActivity() {
         private const val TAG = "MainActivity"
         const val PROJECT_URL = "https://github.com/storytellerF/Fei"
     }
+}
+
+class HidConnection(activity: MainActivity) : ServiceConnection {
+    private val activityRef = WeakReference(activity)
+    override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+        val activity = activityRef.get() ?: return
+        Toast.makeText(
+            activity,
+            activity.getString(R.string.service_connected),
+            Toast.LENGTH_SHORT
+        ).show()
+        val feiLocal = service as FeiService.Fei
+        Log.i("HidConnection", "onServiceConnected: $feiLocal")
+        activity.fei.value = feiLocal
+    }
+
+    override fun onServiceDisconnected(name: ComponentName?) {
+        val activity = activityRef.get() ?: return
+        activity.fei.value = null
+        Toast.makeText(
+            activity,
+            activity.getString(R.string.service_closed),
+            Toast.LENGTH_SHORT
+        ).show()
+    }
+}
+
+class CustomTabConnection(activity: MainActivity) : CustomTabsServiceConnection() {
+    private val activityRef = WeakReference(activity)
+    override fun onCustomTabsServiceConnected(
+        name: ComponentName,
+        client: CustomTabsClient
+    ) {
+        thread(name = "warmup chrome tab") {
+            val warmup = client.warmup(0)
+            Log.i("CustomTabConnection", "onCustomTabsServiceConnected: warmup $warmup")
+            val newSession = client.newSession(object : CustomTabsCallback() {
+
+            })
+            activityRef.get()?.newSession = newSession
+            newSession?.mayLaunchUrl(
+                Uri.parse(MainActivity.PROJECT_URL),
+                null,
+                null
+            )
+        }
+
+    }
+
+    override fun onServiceDisconnected(name: ComponentName) {}
 }
 
 @Composable
