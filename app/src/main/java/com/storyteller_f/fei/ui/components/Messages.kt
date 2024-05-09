@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.storyteller_f.fei.service.Message
 import com.storyteller_f.fei.R
 
@@ -51,14 +53,15 @@ fun MessageItem(@PreviewParameter(MessagesProvider::class) item: Message) {
         }
         .padding(bottom = 8.dp)
         .fillMaxWidth()) {
-        Box(
+        AsyncImage(
+            model = "https://api.multiavatar.com/${item.from}.png",
+            contentDescription = item.from,
             modifier = Modifier
-                .width(30.dp)
-                .height(30.dp)
-                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
-        ) {
-
-        }
+                .padding(top = 4.dp)
+                .width(40.dp)
+                .height(40.dp)
+                .background(MaterialTheme.colorScheme.primary, CircleShape)
+        )
         Column(modifier = Modifier.padding(start = 8.dp)) {
             Text(text = item.from)
             Text(text = item.data, maxLines = maxLines)
@@ -114,9 +117,13 @@ fun MessagePage(
             }
         }
         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextField(value = content, onValueChange = {
-                content = it
-            }, modifier = Modifier.weight(1f).heightIn(max = 100.dp))
+            TextField(
+                value = content, onValueChange = {
+                    content = it
+                }, modifier = Modifier
+                    .weight(1f)
+                    .heightIn(max = 100.dp)
+            )
             Button(onClick = {
                 sendMessage(content)
                 content = ""

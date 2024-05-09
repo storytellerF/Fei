@@ -128,4 +128,5 @@ dependencies {
     if (yongFolder == "local" && yongModule != null) {
         testImplementation(yongModule)
     }
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }
