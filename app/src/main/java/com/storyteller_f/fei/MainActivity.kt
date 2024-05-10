@@ -130,12 +130,14 @@ class MainActivity : ComponentActivity() {
             NoOpBluetoothFei()
         }
     }
-    val fei = MutableStateFlow<FeiService.Fei?>(null)
+    private val fei = MutableStateFlow<FeiService.Fei?>(null)
+    private val currentFeiBinder get() = fei.value
+
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            currentFeiBinder()?.feiService?.onUserGrantNotificationPermission()
+            currentFeiBinder?.feiService?.onUserGrantNotificationPermission()
         }
     }
 
@@ -155,6 +157,11 @@ class MainActivity : ComponentActivity() {
             )
         )
     }
+
+    private val feiServiceConnection by lazy { HidConnection(this) }
+
+    var newSession: CustomTabsSession? = null
+    private val chromeConnection by lazy { CustomTabConnection(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -217,9 +224,8 @@ class MainActivity : ComponentActivity() {
         }
         val intent = Intent(this, FeiService::class.java)
         startService(intent)
-        if (currentFeiBinder() == null) bindService(intent, feiServiceConnection, 0)
-        CustomTabsClient.bindCustomTabsService(this, customTabPackageName, chromeConnection)
-
+        if (currentFeiBinder == null) bindService(intent, feiServiceConnection, 0)
+        CustomTabsClient.bindCustomTabsService(this, CUSTOM_TAB_PACKAGE_NAME, chromeConnection)
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)
@@ -323,8 +329,8 @@ class MainActivity : ComponentActivity() {
     ) {
         FeiMainToolbar(
             port.toString(),
-            { currentFeiBinder()?.restart() },
-            { currentFeiBinder()?.stop() },
+            { currentFeiBinder?.restart() },
+            { currentFeiBinder?.stop() },
             sendText,
             {
                 scope.launch {
@@ -349,20 +355,12 @@ class MainActivity : ComponentActivity() {
     private fun saveToLocal(it: SharedFileInfo) {
         val uri = Uri.parse(it.uri)
         assert(uri.scheme != "file")
-        currentFeiBinder()?.saveToLocal(uri, it)
+        currentFeiBinder?.saveToLocal(uri, it)
     }
 
-    private fun deleteItem(path: SharedFileInfo) {
-        val uri = Uri.parse(path.uri)
-        lifecycleScope.launch {
-            if (uri.scheme == "file") {
-                uri.path?.let { File(it).delete() }
-            } else {
-                removeUri(path)
-            }
-            cacheInvalid()//when delete
-            emitRefreshEvent()
-        }
+    private fun deleteItem(info: SharedFileInfo) {
+        val uri = Uri.parse(info.uri)
+        currentFeiBinder?.deleteUri(uri, info)
     }
 
     private fun NavGraphBuilder.navPages(
@@ -415,40 +413,19 @@ class MainActivity : ComponentActivity() {
     fun Messages() {
         val messageList by messageFlow.collectAsState(initial = emptyList())
         MessagePage(messageList) {
-            currentFeiBinder()?.sendMessage(it)
+            currentFeiBinder?.sendMessage(it)
         }
     }
 
     private fun addUri(uri: List<Uri>) {
-        lifecycleScope.launch {
-            uri.forEach {
-                contentResolver.takePersistableUriPermission(
-                    it,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-                saveUri(it)
-            }
+        uri.forEach {
+            contentResolver.takePersistableUriPermission(
+                it,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            currentFeiBinder?.appendUri(it)
         }
-
     }
-
-    private suspend fun saveUri(uri: Uri) {
-        savedUriFile.appendText(uri.toString())
-        cacheInvalid()//when save
-        emitRefreshEvent()
-    }
-
-    private suspend fun emitRefreshEvent() {
-        currentFeiBinder()?.feiService?.server?.emitRefreshEvent()
-    }
-
-    private val feiServiceConnection by lazy { HidConnection(this) }
-
-    private fun currentFeiBinder() = fei.value
-
-    private val customTabPackageName = "com.android.chrome" // Change when in stable
-    var newSession: CustomTabsSession? = null
-    private val chromeConnection by lazy { CustomTabConnection(this) }
 
     override fun onResume() {
         super.onResume()
@@ -457,9 +434,17 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun bindFei(feiBinder: FeiService.Fei) {
+        fei.value = feiBinder
+    }
+
+    fun unbindFei() {
+        fei.value = null
+    }
+
     companion object {
-        private const val TAG = "MainActivity"
         const val PROJECT_URL = "https://github.com/storytellerF/Fei"
+        private const val CUSTOM_TAB_PACKAGE_NAME = "com.android.chrome" // Change when in stable
     }
 }
 
@@ -472,14 +457,14 @@ class HidConnection(activity: MainActivity) : ServiceConnection {
             activity.getString(R.string.service_connected),
             Toast.LENGTH_SHORT
         ).show()
-        val feiLocal = service as FeiService.Fei
-        Log.i("HidConnection", "onServiceConnected: $feiLocal")
-        activity.fei.value = feiLocal
+        val fei = service as FeiService.Fei
+        Log.i("HidConnection", "onServiceConnected: $fei")
+        activity.bindFei(fei)
     }
 
     override fun onServiceDisconnected(name: ComponentName?) {
         val activity = activityRef.get() ?: return
-        activity.fei.value = null
+        activity.unbindFei()
         Toast.makeText(
             activity,
             activity.getString(R.string.service_closed),

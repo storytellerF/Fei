@@ -1,7 +1,7 @@
 [versions]
 accompanist-permissions = "0.30.1"
 activity-compose = "1.9.0"
-androidx-core-ktx = "1.13.0"
+androidx-core-ktx = "1.13.1"
 androidx-junit = "1.1.5"
 browser = "1.8.0"
 compose-prefs3 = "1.0.5"
@@ -9,18 +9,19 @@ core = "3.5.1"
 core-splashscreen = "1.0.1"
 customview-poolingcontainer = "1.0.0"
 customview = "1.1.0"
-datastore-preferences = "1.1.0"
+datastore-preferences = "1.1.1"
 espresso-core = "3.5.1"
 junit = "4.13.2"
 kotlinx-coroutines = "1.8.0"
-ktor-server-core = "2.3.9"
+ktor-client = "2.3.9"
+ktor-server = "2.3.9"
 leakcanary-android = "2.12"
 lifecycle-runtime-ktx = "2.7.0"
 logback-android = "3.0.0"
 material3 = "1.2.1"
 navigation-compose = "2.7.7"
-ui = "1.6.6"
-webkit = "1.10.0"
+ui = "1.6.7"
+webkit = "1.11.0"
 rules = "1.5.0"
 
 [libraries]
@@ -45,28 +46,29 @@ androidx-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", versi
 androidx-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "ui" }
 androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
 compose-prefs3 = { module = "com.github.JamalMulla:ComposePrefs3", version.ref = "compose-prefs3" }
-ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor-server-core" }
 logback-android = { module = "com.github.tony19:logback-android", version.ref = "logback-android" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "core" }
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
-ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor-server-core" }
-ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor-server-core" }
-ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor-server-core" }
-ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor-server-core" }
-ktor-server-auto-head-response = { module = "io.ktor:ktor-server-auto-head-response", version.ref = "ktor-server-core" }
-ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor-server-core" }
-ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor-server-core" }
-ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor-server-core" }
-ktor-server-host-common = { module = "io.ktor:ktor-server-host-common", version.ref = "ktor-server-core" }
-ktor-server-html-builder = { module = "io.ktor:ktor-server-html-builder", version.ref = "ktor-server-core" }
-ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor-server-core" }
-ktor-server-partial-content = { module = "io.ktor:ktor-server-partial-content", version.ref = "ktor-server-core" }
-ktor-server-sessions = { module = "io.ktor:ktor-server-sessions", version.ref = "ktor-server-core" }
-ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor-server-core" }
-ktor-server-thymeleaf = { module = "io.ktor:ktor-server-thymeleaf", version.ref = "ktor-server-core" }
-ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor-server-core" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor-client" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor-client" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor-client" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor-client" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor-server" }
+ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor-server" }
+ktor-server-auto-head-response = { module = "io.ktor:ktor-server-auto-head-response", version.ref = "ktor-server" }
+ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor-server" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor-server" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor-server" }
+ktor-server-host-common = { module = "io.ktor:ktor-server-host-common", version.ref = "ktor-server" }
+ktor-server-html-builder = { module = "io.ktor:ktor-server-html-builder", version.ref = "ktor-server" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor-server" }
+ktor-server-partial-content = { module = "io.ktor:ktor-server-partial-content", version.ref = "ktor-server" }
+ktor-server-sessions = { module = "io.ktor:ktor-server-sessions", version.ref = "ktor-server" }
+ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor-server" }
+ktor-server-thymeleaf = { module = "io.ktor:ktor-server-thymeleaf", version.ref = "ktor-server" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor-server" }
 leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary-android" }
 androidx-rules = { group = "androidx.test", name = "rules", version.ref = "rules" }
 
@@ -78,4 +80,4 @@ ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-auth",
     "ktor-server-html-builder", "ktor-server-partial-content",
     "ktor-server-sessions", "ktor-server-status-pages",
     "ktor-server-thymeleaf", "ktor-server-websockets", "ktor-serialization-kotlinx-json"]
-ktor-client = ["ktor-client-cio", "ktor-client-websockets", "ktor-client-logging"]
+ktor-client = ["ktor-client-cio", "ktor-client-websockets", "ktor-client-logging", "ktor-client-core"]

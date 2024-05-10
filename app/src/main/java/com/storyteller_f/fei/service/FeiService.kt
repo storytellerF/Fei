@@ -11,13 +11,13 @@ import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleOwner
 import com.storyteller_f.fei.R
+import com.storyteller_f.fei.appendText
 import com.storyteller_f.fei.cacheInvalid
 import com.storyteller_f.fei.dataStore
 import com.storyteller_f.fei.removeUri
 import com.storyteller_f.fei.saveFile
+import com.storyteller_f.fei.savedUriFile
 import io.ktor.http.CacheControl
 import io.ktor.http.ContentType
 import io.ktor.server.application.ApplicationCall
@@ -157,6 +157,36 @@ class FeiService : Service() {
             feiService.stop()
         }
 
+        fun appendUri(uri: Uri) {
+            feiService.appendUri(uri)
+        }
+
+        fun deleteUri(uri: Uri, info: SharedFileInfo) {
+            feiService.deleteUri(uri, info)
+        }
+
+    }
+
+    private fun appendUri(uri: Uri) {
+        println("appendUri $uri")
+        scope.launch {
+            savedUriFile.appendText(uri.toString())
+            cacheInvalid()//when save
+            server.emitRefreshEvent()
+        }
+    }
+
+    private fun deleteUri(uri: Uri, info: SharedFileInfo) {
+        scope.launch {
+            if (uri.scheme == "file") {
+                uri.path?.let { File(it).delete() }
+            } else {
+                removeUri(info)
+            }
+            cacheInvalid()//when delete
+            server.emitRefreshEvent()
+        }
+
     }
 
     companion object {
@@ -183,6 +213,7 @@ suspend fun ApplicationCall.respondSse(eventFlow: Flow<SseEvent>) {
     response.cacheControl(CacheControl.NoCache(null))
     respondBytesWriter(contentType = ContentType.Text.EventStream) {
         eventFlow.collect { event ->
+            println("sse event $event")
             if (event.id != null) {
                 writeStringUtf8("id: ${event.id}\n")
             }

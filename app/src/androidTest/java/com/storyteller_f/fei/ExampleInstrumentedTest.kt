@@ -1,6 +1,7 @@
 package com.storyteller_f.fei
 
 import android.content.Intent
+import androidx.core.net.toUri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.ServiceTestRule
@@ -10,6 +11,7 @@ import com.storyteller_f.fei.service.ServerState
 import com.storyteller_f.fei.service.specialEvent
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
@@ -19,6 +21,7 @@ import io.ktor.http.isSuccess
 import io.ktor.http.parameters
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -40,7 +43,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testServerStart() {
-        useService { _, server ->
+        useService { _, _, server ->
             runBlocking {
                 server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
             }
@@ -50,7 +53,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testServerStop() {
-        useService { _, server ->
+        useService { _, _, server ->
             runBlocking {
                 server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
                 assertTrue(server.state.value is ServerState.Started)
@@ -62,7 +65,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testServerRestart() {
-        useService { _, server ->
+        useService { _, _, server ->
             runBlocking {
                 server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
                 val preStartedTime = (server.state.value as ServerState.Started).time
@@ -74,7 +77,7 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testConflictPort() {
-        useService { _, server ->
+        useService { _, _, server ->
             otherServer {
                 runBlocking {
                     server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
@@ -87,25 +90,56 @@ class ExampleInstrumentedTest {
 
     @Test
     fun testLogin() {
-        useClient { httpClient, feiService, cookie ->
-            runBlocking {
-                uriFilePath = File(feiService.filesDir, "list.txt").absolutePath
-                savedUriFile.appendText("file:///test.zip")
-                feiService.cacheInvalid()//when test
-                val response =
-                    httpClient.get("http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/shares") {
-                        headers {
-                            append("cookie", cookie)
-                        }
-                    }
-                assertTrue(response.status.isSuccess())
-                val bodyAsText = response.bodyAsText()
-                assertTrue(bodyAsText.contains("test.zip"))
-            }
+        useClient { fei, httpClient, _, _ ->
+            fei.appendUri("file:///test.zip".toUri())
+            val response =
+                httpClient.get("http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/shares")
+            assertTrue(response.status.isSuccess())
+            val bodyAsText = response.bodyAsText()
+            assertTrue(bodyAsText.contains("test.zip"))
         }
     }
 
-    private fun useService(block: (FeiService, FeiServer) -> Unit) {
+//    @Test
+//    fun testSSE() {
+//        println("testSSE--")
+//        useSSE { fei, sseClient ->
+//            println("testSSE-- blocking")
+//            val deferred = async {
+//                sseClient.sseSession(urlString = "http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/sse").incoming.first {
+//                    println("testSSE-- receive $it")
+//                    it.event == "refresh"
+//                    true
+//                }
+//            }
+//            println("testSSE-- add uri")
+//            fei.appendUri("file:///test.zip".toUri())
+//            deferred.await()
+//        }
+//    }
+
+//    private fun useSSE(block: suspend CoroutineScope.(FeiService.Fei, sseClient: HttpClient) -> Unit) {
+//        useClient { fei, _, _, cookie ->
+//            println("testSSE-- client sse")
+//            HttpClient {
+//                install(SSE) {
+//                    showCommentEvents()
+//                    showRetryEvents()
+//                }
+//                install(Logging)
+//                defaultRequest {
+//                    headers {
+//                        append("cookie", cookie)
+//                    }
+//                }
+//            }.use {
+//                println("testSSE-- block")
+//                block(fei, it)
+//            }
+//        }
+//    }
+
+    private fun useService(block: (FeiService.Fei, FeiService, FeiServer) -> Unit) {
         val serviceIntent = Intent(
             ApplicationProvider.getApplicationContext(),
             FeiService::class.java
@@ -113,17 +147,25 @@ class ExampleInstrumentedTest {
         specialEvent.value = FeiService.EVENT_OFF
         try {
             val binder = serviceRule.bindService(serviceIntent)
-            val feiService = (binder as FeiService.Fei).feiService
-            block(feiService, feiService.server)
+            val fei = binder as FeiService.Fei
+            val feiService = fei.feiService
+            block(fei, feiService, feiService.server)
         } finally {
             serviceRule.unbindService()
         }
     }
 
-    private fun useClient(block: (HttpClient, FeiService, String) -> Unit) {
-        useService { service, server ->
+    private fun useClient(block: suspend CoroutineScope.(FeiService.Fei, HttpClient, FeiService, cookie: String) -> Unit) {
+        useService { fei, service, server ->
+            uriFilePath = File(service.filesDir, "list.txt").absolutePath
+            val cookieMap = mutableMapOf<String, String>()
             HttpClient(CIO) {
                 install(Logging)
+                defaultRequest {
+                    headers {
+                        cookieMap.forEach(::append)
+                    }
+                }
             }.use {
                 runBlocking {
                     server.onReceiveEventPort(FeiService.DEFAULT_PORT, null)
@@ -131,9 +173,11 @@ class ExampleInstrumentedTest {
                         "http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/login",
                         formParameters = parameters {
                             append("user", "hidden")
-                            append("password", "abc")
+                            append("password", "")
                         }).headers["set-cookie"]!!
-                    block(it, service, cookie)
+                    cookieMap["cookie"] = cookie
+                    println("testSSE-- cookie $cookie")
+                    block(fei, it, service, cookie)
                 }
             }
         }

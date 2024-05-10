@@ -75,19 +75,23 @@ fun Application.plugPlugins(context: Context) {
                 val pass = context.dataStore.data.map {
                     it[stringPreferencesKey("pass")]
                 }.firstOrNull()
+                println("form validate $credential $pass")
                 if (pass == null || credential.password == pass) {
                     UserIdPrincipal("pass")
                 } else null
             }
             challenge {
+                println("form challenge")
                 call.respond(HttpStatusCode.Unauthorized, "Credentials are not valid")
             }
         }
         session<UserSession>("auth-session") {
             validate { session ->
+                println("session validate")
                 session
             }
             challenge {
+                println("session challenge")
                 call.respondRedirect("/login")
             }
         }

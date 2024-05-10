@@ -221,6 +221,7 @@ class FeiServer(feiService: FeiService) {
     }
 
     suspend fun emitRefreshEvent() {
+        println("emitRefreshEvent")
         val serverState = state.value
         if (serverState is ServerState.Started) {
             val channel = serverState.channel
