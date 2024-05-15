@@ -10,7 +10,9 @@ import android.util.Log
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.app.PendingIntentCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.storyteller_f.fei.MainActivity
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.appendText
 import com.storyteller_f.fei.cacheInvalid
@@ -32,7 +34,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
@@ -65,16 +66,8 @@ class FeiService : Service() {
     override fun onCreate() {
         Log.d(TAG, "onCreate() called")
         super.onCreate()
-        val channelId = FOREGROUND_CHANNEL_ID
-        val channel =
-            NotificationChannelCompat.Builder(channelId, NotificationManagerCompat.IMPORTANCE_MIN)
-                .apply {
-                    setName("running")
-                    this.setDescription(getString(R.string.foreground_service_channel_description))
-                }.build()
-        val managerCompat = NotificationManagerCompat.from(this)
-        if (managerCompat.getNotificationChannel(channelId) == null)
-            managerCompat.createNotificationChannel(channel)
+        installNotificationChannel()
+        installDefaultNotificationChannel()
 
         scope.launch {
             combine(portFlow, specialEvent) { port, eventPort ->
@@ -85,26 +78,84 @@ class FeiService : Service() {
             }
         }
         scope.launch {
-            server.state.filterIsInstance<ServerState.Error>().collectLatest {
-                postNotify(it.cause.message ?: "error: ${it.cause::class.qualifiedName}")
+            server.state.collectLatest {
+                when (it) {
+                    is ServerState.Started -> postForegroundNotify("Work on ${it.port}")
+
+                    is ServerState.Error -> postForegroundNotify(
+                        it.exceptionMessage
+                    )
+
+                    is ServerState.Stopped -> postForegroundNotify("Stopped")
+
+                    ServerState.Init -> postForegroundNotify("Idle")
+                }
             }
         }
 
     }
 
-    private fun postNotify(managerCompat: NotificationManagerCompat, message: String) {
-        if (managerCompat.areNotificationsEnabled()) {
+    private fun installNotificationChannel() {
+        val channelId = FOREGROUND_CHANNEL_ID
+        val channel =
+            NotificationChannelCompat.Builder(channelId, NotificationManagerCompat.IMPORTANCE_MIN)
+                .apply {
+                    setName("running")
+                    setDescription(getString(R.string.foreground_service_channel_description))
+                }.build()
+        val managerCompat = NotificationManagerCompat.from(this)
+        if (managerCompat.getNotificationChannel(channelId) == null)
+            managerCompat.createNotificationChannel(channel)
+    }
+
+    private fun installDefaultNotificationChannel() {
+        val channelId = DEFAULT_CHANNEL_ID
+        val channel =
+            NotificationChannelCompat.Builder(channelId, NotificationManagerCompat.IMPORTANCE_MIN)
+                .apply {
+                    setName("default")
+                    setDescription("default")
+                }.build()
+        val managerCompat = NotificationManagerCompat.from(this)
+        if (managerCompat.getNotificationChannel(channelId) == null)
+            managerCompat.createNotificationChannel(channel)
+    }
+
+
+    private fun postForegroundNotify(message: String) {
+        if (NotificationManagerCompat.from(this).areNotificationsEnabled()) {
             val notification =
                 NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
                     .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle(getString(R.string.app_name)).setContentText(message).build()
+                    .setContentTitle(getString(R.string.app_name))
+                    .setContentText(message)
+                    .build()
+            notification.contentIntent = openMainActivity()
             startForeground(FOREGROUND_NOTIFICATION_ID, notification)
         }
     }
 
     private fun postNotify(message: String) {
-        postNotify(NotificationManagerCompat.from(this), message)
+        val managerCompat = NotificationManagerCompat.from(this)
+        if (managerCompat.areNotificationsEnabled()) {
+            val notification =
+                NotificationCompat.Builder(this, DEFAULT_CHANNEL_ID)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle(getString(R.string.app_name))
+                    .setContentText(message)
+                    .build()
+            notification.contentIntent = openMainActivity()
+            managerCompat.notify(DEFAULT_NOTIFICATION_ID, notification)
+        }
     }
+
+    private fun openMainActivity() = PendingIntentCompat.getActivity(
+        this,
+        0,
+        Intent(this, MainActivity::class.java),
+        0,
+        false
+    )
 
     override fun onDestroy() {
         Log.d(TAG, "onDestroy() called")
@@ -193,6 +244,8 @@ class FeiService : Service() {
         private const val TAG = "FeiService"
         private const val FOREGROUND_NOTIFICATION_ID = 10
         private const val FOREGROUND_CHANNEL_ID = "foreground"
+        private const val DEFAULT_NOTIFICATION_ID = 10
+        private const val DEFAULT_CHANNEL_ID = "default"
         const val DEFAULT_PORT = 8080
         const val LISTENER_ADDRESS = "0.0.0.0"
         const val DEFAULT_ADDRESS = "127.0.0.1"

@@ -39,6 +39,9 @@ sealed interface ServerState {
 
     data class Error(val cause: Throwable) : ServerState {
         constructor(message: String) : this(java.lang.Exception(message))
+
+        val exceptionMessage = (cause.localizedMessage ?: cause::class.qualifiedName
+        ?: cause::class.toString())
     }
 }
 
@@ -182,6 +185,7 @@ class FeiServer(feiService: FeiService) {
                     //stop server
                     stopIfNeed("stop event.")
                 }
+
                 FeiService.EVENT_RESTART -> {
                     Log.i(TAG, "onReceiveEventPort: restart")
                     stopIfNeed("restart event.")
