@@ -1,0 +1,5 @@
+{
+    "android-dev-ext.codeCompletionLibraries": [
+        "androidx.activity:activity"
+    ]
+}
