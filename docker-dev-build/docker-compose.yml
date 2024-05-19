@@ -1,13 +1,14 @@
 services:
   devcontainer:
-    image: mcr.microsoft.com/devcontainers/base:ubuntu
+    build: 
+      context: ../docker-dev-build
     command: /bin/sh -c "while sleep 1000; do :; done"
     ports: 
       - "8080-8090"
     volumes:
       - ..:/workspace:cached
-      - gradle-cache:/root/.gradle
-      - top-cache:/root/.cache
+      - gradle-cache:/home/vscode/.gradle
+      - top-cache:/home/vscode/.cache
 
   emulator:
     image: budtmo/docker-android:emulator_11.0
