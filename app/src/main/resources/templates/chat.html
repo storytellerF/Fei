@@ -27,26 +27,32 @@
             display: flex;
             flex-direction: column;
             margin: 8px;
-            height: calc(100vh - 16px);
+            height: calc(100vh - 70px);
         }
+
         button {
             padding: 10px 14px;
         }
+
         .message-line {
             display: flex;
             min-height: 40px;
             margin-bottom: 10px;
         }
+
         .message-avatar {
             width: 40px;
             height: 40px;
             margin-right: 4px;
+            border-radius: 20px;
             background-color: aliceblue;
         }
-        .message-avatar > img {
+
+        .message-avatar>img {
             width: 40px;
             height: 40px;
         }
+
         .message-content {
             flex-grow: 1;
             height: 100%;
@@ -55,48 +61,52 @@
 </head>
 
 <body>
-    <h1>template</h1>
-    <div id="message-list">
-        <div class="message-line" id="template">
-            <div class="message-avatar">
-                <img/>
-            </div>
-            
-            <div class="message-content">
-                <div class="message-user">
-
-                </div>
-                <div class="message-down">
-                    <div class="message-text">
-
-                    </div>
-                    <button class="copy-text">copy</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div id="message-list"></div>
     <div id="input-group">
         <input id="input" />
         <button id="send-button">send</button>
     </div>
 </body>
 <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.8/dist/clipboard.min.js"></script>
-<script>
-    let messageList = document.getElementById("message-list")
-    let title = document.querySelector("h1")
+<script type="module">
+    import {
+        init,
+        classModule,
+        propsModule,
+        styleModule,
+        eventListenersModule,
+        h
+    } from 'https://cdn.jsdelivr.net/npm/snabbdom@3.6.2/+esm'
+
+    const patch = init([
+        // Init patch function with chosen modules
+        classModule, // makes it easy to toggle classes
+        propsModule, // for setting properties on DOM elements
+        styleModule, // handles styling on elements with support for animations
+        eventListenersModule // attaches event listeners
+    ]);
+
+    const container = document.getElementById("message-list");
+    let lastNode = container
     let input = document.querySelector("#input")
     let sendButton = document.querySelector("#send-button")
-    let documentElement = document.documentElement
-    const template = document.getElementById("template")
-    console.log(template);
+
+    const msgList = []
+    const loadingNode = h(
+        "div#message-list",
+        { on: { click: () => console.log("div clicked") } },
+        "loading"
+    );
+    // Patch into empty DOM element – this modifies the DOM as a side effect
+    patch(lastNode, loadingNode);
+    lastNode = loadingNode
 
     let address = 'ws://' + window.location.host + "/chat"
-    console.log(address);
     var ws = new WebSocket(address);
     ws.onmessage = function (msg) {
         console.log(msg);
-        const p = flush(msg)
-        messageList.appendChild(p)
+        msgList.push(msg)
+        flush()
     };
     ws.onerror = function (e) {
         console.log(e);
@@ -114,19 +124,37 @@
         input.value = ""
     }
 
-    function flush(msg) {
-        let element = template.cloneNode(true)
-        let params = JSON.parse(msg.data)
-        element.getElementsByClassName("message-avatar")[0].children[0].src = `/avatar/${params.from}.png`
-        element.getElementsByClassName("message-user")[0].innerText = params.from
-        element.getElementsByClassName("message-text")[0].innerText = params.data
-        return element
+    function flush() {
+        const vnode = h(
+            "div#message-list",
+            {},
+            msgList.map((e) => {
+                let params = JSON.parse(e.data)
+                return h("div.message-line", {}, [
+                    h("div.message-avatar", {}, [
+                        h("img", {
+                            props: { src: `/avatar/${params.from}.png`, alt: params.from }
+                        })
+                    ]),
+                    h("div.message-content", {}, [
+                        h("div.message-user", {}, params.from),
+                        h("div.message-down", {}, [
+                            h("div.message-text", {}, params.data),
+                            h("button.copy-text", {}, "copy")
+                        ])
+                    ])
+                ])
+            })
+        );
+        patch(lastNode, vnode)
+        lastNode = vnode
     }
     new ClipboardJS('.copy-text', {
         text: function (trigger) {
             return trigger.previousElementSibling.innerText;
         },
     });
+
 </script>
 
 </html>
