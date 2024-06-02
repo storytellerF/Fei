@@ -184,10 +184,12 @@ class FeiService : Service() {
     }
 
     fun restart() {
+        postNotify("restart")
         specialEvent.value = EVENT_RESTART
     }
 
     fun stop() {
+        postNotify("stop")
         specialEvent.value = EVENT_STOP
     }
 

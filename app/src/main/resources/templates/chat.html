@@ -6,7 +6,7 @@
     <meta name="viewport"
         content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Document</title>
+    <title>Chat</title>
     <style>
         #message-list {
             flex-grow: 1;
@@ -42,6 +42,10 @@
             height: 40px;
             margin-right: 4px;
             background-color: aliceblue;
+        }
+        .message-avatar > img {
+            width: 40px;
+            height: 40px;
         }
         .message-content {
             flex-grow: 1;
@@ -113,6 +117,7 @@
     function flush(msg) {
         let element = template.cloneNode(true)
         let params = JSON.parse(msg.data)
+        element.getElementsByClassName("message-avatar")[0].children[0].src = `/avatar/${params.from}.png`
         element.getElementsByClassName("message-user")[0].innerText = params.from
         element.getElementsByClassName("message-text")[0].innerText = params.data
         return element

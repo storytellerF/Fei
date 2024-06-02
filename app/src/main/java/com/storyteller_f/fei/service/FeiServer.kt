@@ -7,12 +7,31 @@ import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.receiveDeserialized
 import io.ktor.client.plugins.websocket.webSocket
+import io.ktor.client.request.request
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.Headers
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.OutgoingContent
+import io.ktor.http.content.TextContent
+import io.ktor.http.withCharset
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
 import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
+import io.ktor.server.request.uri
+import io.ktor.server.response.header
+import io.ktor.server.response.respond
+import io.ktor.util.filter
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.copyAndClose
 import io.ktor.websocket.close
 import io.ktor.websocket.send
 import kotlinx.coroutines.CompletableDeferred
@@ -55,16 +74,17 @@ class FeiServer(feiService: FeiService) {
     private suspend fun startInternal(port: Int) {
         Log.d(TAG, "startInternal() called")
         try {
-            val (server, channel) = setupServer(port)
-            val (setupSelfClient, session) = setupSelfClient(port)
+            val client = httpClient()
+            val (server, channel) = setupServer(port, client)
+            val (session, messageFlow) = setupSelfClient(port, client)
             val time = System.currentTimeMillis()
             state.value = ServerState.Started(
                 port,
                 server,
-                session.first,
-                setupSelfClient,
+                session,
+                client,
                 channel,
-                session.second,
+                messageFlow,
                 time
             )
             Log.i(TAG, "startInternal: $time")
@@ -74,29 +94,75 @@ class FeiServer(feiService: FeiService) {
         }
     }
 
-    private suspend fun setupServer(port: Int): Pair<NettyApplicationEngine, MutableSharedFlow<SseEvent>> {
+    private suspend fun setupServer(
+        port: Int,
+        client: HttpClient
+    ): Pair<NettyApplicationEngine, MutableSharedFlow<SseEvent>> {
         val channelWaitWorker = CompletableDeferred<MutableSharedFlow<SseEvent>>()
         val start = embeddedServer(Netty, port = port, host = FeiService.LISTENER_ADDRESS) {
             plugPlugins(context)
             channelWaitWorker.complete(setupSse())
             configureRouting(context)
             webSocketsService()
+            setupAvatarProxy(client)
         }.start(wait = false)
         return start to channelWaitWorker.await()
     }
 
-    private suspend fun setupSelfClient(port: Int): Pair<HttpClient, Pair<DefaultClientWebSocketSession, MutableStateFlow<List<Message>>>> {
-        val httpClient = HttpClient(CIO) {
-            install(WebSockets) {
-                pingInterval = 20_000
-                contentConverter = KotlinxWebsocketSerializationConverter(Json)
+    /**
+     * 请求url
+     * http://localhost:80080/avatar/user1.png
+     */
+    private fun Application.setupAvatarProxy(client: HttpClient) {
+        // Let's intercept all the requests at the [ApplicationCallPipeline.Call] phase.
+        intercept(ApplicationCallPipeline.Call) {
+            val uri = call.request.uri
+            val avatarString = "avatar"
+            if (uri.contains(avatarString)) {
+                val index = uri.indexOf(avatarString)
+                val pngName = uri.substring(index + avatarString.length + 1)
+                // We create a GET request to the wikipedia domain and return the call (with the request and the unprocessed response).
+                val response =
+                    client.request("https://api.multiavatar.com/${pngName}")
+
+                // Get the relevant headers of the client response.
+                val proxiedHeaders = response.headers
+                val contentType = proxiedHeaders[HttpHeaders.ContentType]
+                val contentLength = proxiedHeaders[HttpHeaders.ContentLength]
+
+                call.respond(object : OutgoingContent.WriteChannelContent() {
+                    override val contentLength: Long? = contentLength?.toLong()
+                    override val contentType: ContentType? =
+                        contentType?.let { ContentType.parse(it) }
+                    override val headers: Headers = Headers.build {
+                        appendAll(proxiedHeaders.filter { key, _ ->
+                            !key.equals(
+                                HttpHeaders.ContentType,
+                                ignoreCase = true
+                            ) && !key.equals(HttpHeaders.ContentLength, ignoreCase = true)
+                        })
+                    }
+                    override val status: HttpStatusCode = response.status
+                    override suspend fun writeTo(channel: ByteWriteChannel) {
+                        response.bodyAsChannel().copyAndClose(channel)
+                    }
+                })
+            } else {
+                proceed()
             }
+
         }
+    }
+
+    private suspend fun setupSelfClient(
+        port: Int,
+        client: HttpClient
+    ): Pair<DefaultClientWebSocketSession, MutableStateFlow<List<Message>>> {
 
         val messagesCache = MutableStateFlow<List<Message>>(emptyList())
         val sessionWaitWorker = CompletableDeferred<DefaultClientWebSocketSession>()
         scope.launch {
-            httpClient.webSocket(
+            client.webSocket(
                 method = HttpMethod.Get,
                 host = "127.0.0.1",
                 port = port,
@@ -114,7 +180,16 @@ class FeiServer(feiService: FeiService) {
             }
             Log.i(TAG, "startInternal: self webSocket end")
         }
-        return httpClient to (sessionWaitWorker.await() to messagesCache)
+        return (sessionWaitWorker.await() to messagesCache)
+    }
+
+    private fun httpClient(): HttpClient {
+        return HttpClient(CIO) {
+            install(WebSockets) {
+                pingInterval = 20_000
+                contentConverter = KotlinxWebsocketSerializationConverter(Json)
+            }
+        }
     }
 
     private suspend fun stopInternal(cause: String) {
