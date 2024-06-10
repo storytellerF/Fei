@@ -1,5 +1,6 @@
 package com.storyteller_f.fei.service
 
+import android.content.Context
 import android.util.Log
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -37,6 +38,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import java.lang.ref.WeakReference
+
+var channelWaitWorker: CompletableDeferred<MutableSharedFlow<SseEvent>>? = null
 
 sealed interface ServerState {
     data object Init : ServerState
@@ -94,62 +98,18 @@ class FeiServer(feiService: FeiService) {
         port: Int,
         client: HttpClient
     ): Pair<NettyApplicationEngine, MutableSharedFlow<SseEvent>> {
-        val channelWaitWorker = CompletableDeferred<MutableSharedFlow<SseEvent>>()
-        val start = embeddedServer(Netty, port = port, host = FeiService.LISTENER_ADDRESS) {
-            plugPlugins(context)
-            channelWaitWorker.complete(setupSse())
-            configureRouting(context)
-            webSocketsService()
-            setupAvatarProxy(client)
-        }.start(wait = false)
-        return start to channelWaitWorker.await()
+        channelWaitWorker = CompletableDeferred()
+        clientRef = WeakReference(client)
+        contextRef = WeakReference(context)
+        return embeddedServer(
+            Netty,
+            port = port,
+            host = FeiService.LISTENER_ADDRESS,
+        ) {
+            module()
+        }.start(wait = false) to channelWaitWorker!!.await()
     }
 
-    private val avatarPattern = Regex("/avatar/(\\w+).png")
-
-    /**
-     * 请求url
-     * http://localhost:80080/avatar/user1.png
-     */
-    private fun Application.setupAvatarProxy(client: HttpClient) {
-        // Let's intercept all the requests at the [ApplicationCallPipeline.Call] phase.
-        intercept(ApplicationCallPipeline.Call) {
-            val uri = call.request.uri
-            avatarPattern.find(uri).runCatching {
-                this?.groups?.get(1)!!.value
-            }.onSuccess { pngName ->
-                // We create a GET request to the wikipedia domain and return the call (with the request and the unprocessed response).
-                val response =
-                    client.request(getAvatarIcon(pngName))
-
-                // Get the relevant headers of the client response.
-                val proxiedHeaders = response.headers
-                val contentType = proxiedHeaders[HttpHeaders.ContentType]
-                val contentLength = proxiedHeaders[HttpHeaders.ContentLength]
-
-                call.respond(object : OutgoingContent.WriteChannelContent() {
-                    override val contentLength: Long? = contentLength?.toLong()
-                    override val contentType: ContentType? =
-                        contentType?.let { ContentType.parse(it) }
-                    override val headers: Headers = Headers.build {
-                        appendAll(proxiedHeaders.filter { key, _ ->
-                            !key.equals(
-                                HttpHeaders.ContentType,
-                                ignoreCase = true
-                            ) && !key.equals(HttpHeaders.ContentLength, ignoreCase = true)
-                        })
-                    }
-                    override val status: HttpStatusCode = response.status
-                    override suspend fun writeTo(channel: ByteWriteChannel) {
-                        response.bodyAsChannel().copyAndClose(channel)
-                    }
-                })
-            }.onFailure {
-                proceed()
-            }
-
-        }
-    }
 
     private suspend fun setupSelfClient(
         port: Int,
@@ -308,5 +268,64 @@ class FeiServer(feiService: FeiService) {
 
     companion object {
         private const val TAG = "FeiServer"
+    }
+}
+
+var contextRef: WeakReference<out Context>? = null
+var clientRef: WeakReference<HttpClient>? = null
+
+fun Application.module() {
+    val context = contextRef?.get()!!
+    val client = clientRef?.get()!!
+    plugPlugins(context)
+    channelWaitWorker?.complete(setupSse())
+    configureRouting(context)
+    webSocketsService()
+    setupAvatarProxy(client)
+}
+
+private val avatarPattern = Regex("/avatar/(\\w+).png")
+
+/**
+ * 请求url
+ * http://localhost:80080/avatar/user1.png
+ */
+private fun Application.setupAvatarProxy(client: HttpClient) {
+    // Let's intercept all the requests at the [ApplicationCallPipeline.Call] phase.
+    intercept(ApplicationCallPipeline.Call) {
+        val uri = call.request.uri
+        avatarPattern.find(uri).runCatching {
+            this?.groups?.get(1)!!.value
+        }.onSuccess { pngName ->
+            // We create a GET request to the wikipedia domain and return the call (with the request and the unprocessed response).
+            val response =
+                client.request(getAvatarIcon(pngName))
+
+            // Get the relevant headers of the client response.
+            val proxiedHeaders = response.headers
+            val contentType = proxiedHeaders[HttpHeaders.ContentType]
+            val contentLength = proxiedHeaders[HttpHeaders.ContentLength]
+
+            call.respond(object : OutgoingContent.WriteChannelContent() {
+                override val contentLength: Long? = contentLength?.toLong()
+                override val contentType: ContentType? =
+                    contentType?.let { ContentType.parse(it) }
+                override val headers: Headers = Headers.build {
+                    appendAll(proxiedHeaders.filter { key, _ ->
+                        !key.equals(
+                            HttpHeaders.ContentType,
+                            ignoreCase = true
+                        ) && !key.equals(HttpHeaders.ContentLength, ignoreCase = true)
+                    })
+                }
+                override val status: HttpStatusCode = response.status
+                override suspend fun writeTo(channel: ByteWriteChannel) {
+                    response.bodyAsChannel().copyAndClose(channel)
+                }
+            })
+        }.onFailure {
+            proceed()
+        }
+
     }
 }

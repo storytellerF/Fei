@@ -65,7 +65,7 @@ fun FeiMainToolbar(
     sendText: (String) -> Unit = {},
     openDrawer: () -> Unit = {},
     deleteAll: () -> Unit = {},
-    stateFlow: Flow<ServerState> = MutableStateFlow(ServerState.Error("TEST")),
+    stateFlow: Flow<ServerState> = MutableStateFlow(ServerState.Init),
 ) {
     var showDialog by rememberSaveable { mutableStateOf(false) }
     var errorDialogContent by remember {
@@ -92,7 +92,7 @@ fun FeiMainToolbar(
                             when (state) {
                                 is ServerState.Error -> MaterialTheme.colorScheme.error
                                 is ServerState.Stopped -> MaterialTheme.colorScheme.tertiary
-                                is ServerState.Init -> MaterialTheme.colorScheme.surface
+                                is ServerState.Init -> MaterialTheme.colorScheme.secondary
                                 else -> MaterialTheme.colorScheme.primary
                             },
                             RoundedCornerShape(8.dp)

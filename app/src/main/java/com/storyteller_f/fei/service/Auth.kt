@@ -1,5 +1,6 @@
 package com.storyteller_f.fei.service
 
+import android.content.Context
 import io.ktor.server.application.Application
 import io.ktor.server.application.call
 import io.ktor.server.auth.Principal
@@ -17,7 +18,7 @@ import java.util.UUID
 
 data class UserSession(val name: String) : Principal
 
-fun Application.configureRouting(feiService: FeiService) {
+fun Application.configureRouting(context: Context) {
     routing {
         get("/login") {
             call.respond(ThymeleafContent("login", mapOf()))
@@ -30,7 +31,7 @@ fun Application.configureRouting(feiService: FeiService) {
             }
         }
         authenticate("auth-session") {
-            contentRoute(feiService)
+            contentRoute(context)
         }
 
     }
