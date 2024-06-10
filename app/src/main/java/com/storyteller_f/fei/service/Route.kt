@@ -60,3 +60,7 @@ fun Route.contentRoute(context: Context) {
 
     }
 }
+
+fun getAvatarIcon(name: String): String {
+    return "https://api.multiavatar.com/${name}.png"
+}

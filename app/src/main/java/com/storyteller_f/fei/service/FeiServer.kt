@@ -105,6 +105,8 @@ class FeiServer(feiService: FeiService) {
         return start to channelWaitWorker.await()
     }
 
+    private val avatarPattern = Regex("/avatar/(\\w+).png")
+
     /**
      * 请求url
      * http://localhost:80080/avatar/user1.png
@@ -113,13 +115,12 @@ class FeiServer(feiService: FeiService) {
         // Let's intercept all the requests at the [ApplicationCallPipeline.Call] phase.
         intercept(ApplicationCallPipeline.Call) {
             val uri = call.request.uri
-            val avatarString = "avatar"
-            if (uri.contains(avatarString)) {
-                val index = uri.indexOf(avatarString)
-                val pngName = uri.substring(index + avatarString.length + 1)
+            avatarPattern.find(uri).runCatching {
+                this?.groups?.get(1)!!.value
+            }.onSuccess { pngName ->
                 // We create a GET request to the wikipedia domain and return the call (with the request and the unprocessed response).
                 val response =
-                    client.request("https://api.multiavatar.com/${pngName}")
+                    client.request(getAvatarIcon(pngName))
 
                 // Get the relevant headers of the client response.
                 val proxiedHeaders = response.headers
@@ -143,7 +144,7 @@ class FeiServer(feiService: FeiService) {
                         response.bodyAsChannel().copyAndClose(channel)
                     }
                 })
-            } else {
+            }.onFailure {
                 proceed()
             }
 

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.storyteller_f.fei.service.Message
 import com.storyteller_f.fei.R
+import com.storyteller_f.fei.service.getAvatarIcon
 
 class MessagesProvider : PreviewParameterProvider<Message> {
     override val values: Sequence<Message>
@@ -54,7 +55,7 @@ fun MessageItem(@PreviewParameter(MessagesProvider::class) item: Message) {
         .padding(bottom = 8.dp)
         .fillMaxWidth()) {
         AsyncImage(
-            model = "https://api.multiavatar.com/${item.from}.png",
+            model = getAvatarIcon(item.from),
             contentDescription = item.from,
             modifier = Modifier
                 .padding(top = 4.dp)

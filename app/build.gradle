@@ -22,6 +22,21 @@ android {
         }
     }
 
+    signingConfigs {
+        def path = System.getenv("storyteller_f_sign_path")
+        def alias = System.getenv("storyteller_f_sign_alias")
+        def signStorePassword = System.getenv("storyteller_f_sign_store_password")
+        def signKeyPassword = System.getenv("storyteller_f_sign_key_password")
+        if (path != null && alias != null && signStorePassword != null && signKeyPassword != null) {
+            create("release") {
+                keyAlias = alias
+                keyPassword = signKeyPassword
+                storeFile = file(path)
+                storePassword = signStorePassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -36,6 +51,9 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            def releaseSignConfig = signingConfigs.findByName("release")
+            if (releaseSignConfig != null)
+                signingConfig = releaseSignConfig
         }
     }
     def javaVersion = JavaVersion.VERSION_17
@@ -128,5 +146,5 @@ dependencies {
     if (yongFolder == "local" && yongModule != null) {
         testImplementation(yongModule)
     }
-    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation(libs.coil.compose)
 }

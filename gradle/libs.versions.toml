@@ -4,6 +4,7 @@ activity-compose = "1.9.0"
 androidx-core-ktx = "1.13.1"
 androidx-junit = "1.1.5"
 browser = "1.8.0"
+coil-compose = "2.6.0"
 compose-prefs3 = "1.0.5"
 core = "3.5.1"
 core-splashscreen = "1.0.1"
@@ -45,6 +46,7 @@ androidx-ui-tooling = { module = "androidx.compose.ui:ui-tooling", version.ref =
 androidx-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "ui" }
 androidx-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "ui" }
 androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil-compose" }
 compose-prefs3 = { module = "com.github.JamalMulla:ComposePrefs3", version.ref = "compose-prefs3" }
 logback-android = { module = "com.github.tony19:logback-android", version.ref = "logback-android" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "core" }

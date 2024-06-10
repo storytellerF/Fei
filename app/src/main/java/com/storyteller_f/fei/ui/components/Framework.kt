@@ -100,7 +100,7 @@ fun FeiMainToolbar(
                             val currentState = state
                             if (currentState is ServerState.Error) {
                                 errorDialogContent = currentState.cause.stackTraceToString()
-                            } else {
+                            } else if (currentState is ServerState.Started) {
                                 showDialog = true
                             }
                         }
