@@ -17,13 +17,16 @@ kotlinx-coroutines = "1.8.0"
 ktor-client = "2.3.9"
 ktor-server = "2.3.9"
 leakcanary-android = "2.12"
-lifecycle-runtime-ktx = "2.7.0"
+lifecycle-runtime-ktx = "2.8.1"
 logback-android = "3.0.0"
 material3 = "1.2.1"
 navigation-compose = "2.7.7"
 ui = "1.6.7"
 webkit = "1.11.0"
 rules = "1.5.0"
+agp = "8.4.1"
+kotlin = "1.9.23"
+serialization = "1.9.23"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
@@ -83,3 +86,8 @@ ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-auth",
     "ktor-server-sessions", "ktor-server-status-pages",
     "ktor-server-thymeleaf", "ktor-server-websockets", "ktor-serialization-kotlinx-json"]
 ktor-client = ["ktor-client-cio", "ktor-client-websockets", "ktor-client-logging", "ktor-client-core"]
+
+[plugins]
+android = { id = "com.android.application", version.ref = "agp" }
+kotlin = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "serialization" }
