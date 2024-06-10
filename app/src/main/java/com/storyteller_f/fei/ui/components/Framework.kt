@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Favorite
@@ -165,12 +167,15 @@ fun FeiMainToolbar(
             ),
         )
     if (errorDialogContent.isNotEmpty()) {
+        val scrollState = rememberScrollState()
         AlertDialog(onDismissRequest = { errorDialogContent = "" }, confirmButton = {
-            Text(text = "Close", modifier = Modifier.clickable {
-                errorDialogContent = ""
-            })
+            Text(text = "Close", modifier = Modifier
+                .clickable {
+                    errorDialogContent = ""
+                }
+            )
         }, text = {
-            Text(text = errorDialogContent)
+            Text(text = errorDialogContent, modifier = Modifier.verticalScroll(scrollState))
         })
     }
 }
