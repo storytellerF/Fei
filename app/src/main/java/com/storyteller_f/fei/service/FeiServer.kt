@@ -57,7 +57,6 @@ sealed interface ServerState {
     data class Stopped(val reason: String) : ServerState
 
     data class Error(val cause: Throwable) : ServerState {
-        constructor(message: String) : this(java.lang.Exception(message))
 
         val exceptionMessage = (cause.localizedMessage ?: cause::class.qualifiedName
         ?: cause::class.toString())

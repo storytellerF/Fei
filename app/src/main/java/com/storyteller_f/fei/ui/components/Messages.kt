@@ -40,6 +40,7 @@ import coil.compose.AsyncImage
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.service.Message
 import com.storyteller_f.fei.service.getAvatarIcon
+import dev.jeziellago.compose.markdowntext.MarkdownText
 
 class MessagesProvider : PreviewParameterProvider<Message> {
     override val values: Sequence<Message>
@@ -79,9 +80,10 @@ fun MessageItem(@PreviewParameter(MessagesProvider::class) item: Message) {
                 .height(40.dp)
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
         )
+
         Column(modifier = Modifier.padding(start = 8.dp)) {
             Text(text = item.from)
-            Text(text = item.data, maxLines = maxLines)
+            MarkdownText(markdown = item.data, maxLines = maxLines)
             if (lineCount > MAX_LINE) {
                 Button(onClick = {
                     maxLines = if (maxLines == MAX_LINE) {

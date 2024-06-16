@@ -146,5 +146,6 @@ dependencies {
     if (yongFolder == "local" && yongModule != null) {
         testImplementation(yongModule)
     }
+    implementation libs.compose.markdown
     implementation(libs.coil.compose)
 }

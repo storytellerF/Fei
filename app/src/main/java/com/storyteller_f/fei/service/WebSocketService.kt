@@ -28,7 +28,7 @@ fun Application.webSocketsService() {
             val thisConnection = Connection(this)
             connections += thisConnection
             try {
-                sendSerialized(Message("system", "You are connected! There are ${connections.count()} users here."))
+                sendSerialized(Message("system", "**You** are connected! There are ${connections.count()} users here."))
                 for (frame in incoming) {
                     frame as? Frame.Text ?: continue
                     val receivedText = frame.readText()
