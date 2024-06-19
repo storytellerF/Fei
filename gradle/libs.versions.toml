@@ -28,6 +28,7 @@ rules = "1.5.0"
 agp = "8.4.2"
 kotlin = "1.9.23"
 serialization = "1.9.23"
+adaptive-android = "1.0.0-beta03"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist-permissions" }
@@ -78,6 +79,7 @@ ktor-server-thymeleaf = { module = "io.ktor:ktor-server-thymeleaf", version.ref 
 ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor-server" }
 leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary-android" }
 androidx-rules = { group = "androidx.test", name = "rules", version.ref = "rules" }
+androidx-adaptive-android = { group = "androidx.compose.material3.adaptive", name = "adaptive-android", version.ref = "adaptive-android" }
 
 [bundles]
 coruntines = ["kotlinx-coroutines-android", "kotlinx-coroutines-core"]
