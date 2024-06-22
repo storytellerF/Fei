@@ -17,5 +17,5 @@ todo:
 4. - [x] 密码认证
 5. - [x] mmap
 6. - [ ] WebRTC
-7. - [ ] 即时聊天支持Markdown
+7. - [x] 即时聊天支持Markdown
 8. - [x] 即时聊天随机头像
