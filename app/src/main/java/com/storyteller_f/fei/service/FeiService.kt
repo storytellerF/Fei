@@ -1,6 +1,5 @@
 package com.storyteller_f.fei.service
 
-import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -12,6 +11,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.PendingIntentCompat
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.lifecycleScope
 import com.storyteller_f.fei.MainActivity
 import com.storyteller_f.fei.R
 import com.storyteller_f.fei.appendText
@@ -26,9 +27,6 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.cacheControl
 import io.ktor.server.response.respondBytesWriter
 import io.ktor.utils.io.writeStringUtf8
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,12 +43,11 @@ val Context.portFlow
 
 val specialEvent = MutableStateFlow<Int?>(null)
 
-class FeiService : Service() {
-    private val job = Job()
-    val scope = CoroutineScope(Dispatchers.IO + job)
+class FeiService : LifecycleService() {
     val server = FeiServer(this)
 
     override fun onBind(intent: Intent): IBinder {
+        super.onBind(intent)
         Log.d(TAG, "onBind() called with: intent = $intent")
         return Fei(this)
     }
@@ -69,7 +66,7 @@ class FeiService : Service() {
         installNotificationChannel()
         installDefaultNotificationChannel()
 
-        scope.launch {
+        lifecycleScope.launch {
             combine(portFlow, specialEvent) { port, eventPort ->
                 eventPort to port
             }.collect { (event, port) ->
@@ -77,7 +74,7 @@ class FeiService : Service() {
                 server.onReceiveEventPort(port, event)
             }
         }
-        scope.launch {
+        lifecycleScope.launch {
             server.state.collectLatest {
                 when (it) {
                     is ServerState.Started -> postForegroundNotify("Work on ${it.port}")
@@ -161,7 +158,7 @@ class FeiService : Service() {
         Log.d(TAG, "onDestroy() called")
         super.onDestroy()
         server.stopBlocking()
-        scope.cancel()
+        lifecycleScope.cancel()
     }
 
     fun onUserGrantNotificationPermission() {
@@ -169,7 +166,7 @@ class FeiService : Service() {
     }
 
     fun saveToLocal(uri: Uri, info: SharedFileInfo) {
-        scope.launch {
+        lifecycleScope.launch {
             saveFile(File(info.name).extension, uri)
             removeUri(info)
             cacheInvalid()//when save to local
@@ -178,7 +175,7 @@ class FeiService : Service() {
     }
 
     fun sendMessage(message: String) {
-        scope.launch {
+        lifecycleScope.launch {
             server.sendMessage(message)
         }
     }
@@ -222,7 +219,7 @@ class FeiService : Service() {
 
     private fun appendUri(uri: Uri) {
         println("appendUri $uri")
-        scope.launch {
+        lifecycleScope.launch {
             savedUriFile.appendText(uri.toString())
             cacheInvalid()//when save
             server.emitRefreshEvent()
@@ -230,7 +227,7 @@ class FeiService : Service() {
     }
 
     private fun deleteUri(uri: Uri, info: SharedFileInfo) {
-        scope.launch {
+        lifecycleScope.launch {
             if (uri.scheme == "file") {
                 uri.path?.let { File(it).delete() }
             } else {

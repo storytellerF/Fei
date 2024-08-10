@@ -2,6 +2,7 @@ package com.storyteller_f.fei.service
 
 import android.content.Context
 import android.util.Log
+import androidx.lifecycle.lifecycleScope
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
@@ -64,7 +65,7 @@ sealed interface ServerState {
 }
 
 class FeiServer(feiService: FeiService) {
-    private val scope = feiService.scope
+    private val scope = feiService.lifecycleScope
     private val context = feiService
     val state = MutableStateFlow<ServerState>(ServerState.Init)
 

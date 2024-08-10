@@ -3,6 +3,7 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.serialization'
     id "com.starter.easylauncher" version "6.3.0"
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -67,9 +68,7 @@ android {
     buildFeatures {
         compose true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion '1.5.12'
-    }
+
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
@@ -94,6 +93,7 @@ dependencies {
     implementation libs.androidx.core.ktx
     implementation libs.androidx.lifecycle.runtime.ktx
     implementation libs.androidx.activity.compose
+    implementation(libs.androidx.lifecycle.service)
 
     implementation libs.androidx.ui
     implementation libs.androidx.ui.tooling.preview
