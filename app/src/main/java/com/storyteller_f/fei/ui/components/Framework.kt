@@ -21,11 +21,13 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -146,26 +148,22 @@ fun FeiMainToolbar(
         },
 
         )
-    if (showDialog)
-        AlertDialog(
+    val (_, qrcodeHorLayout) = computeQrcodeLayout()
+    if (showDialog) {
+        BasicAlertDialog(
             onDismissRequest = { showDialog = false },
-            confirmButton = {
-                Text(
-                    text = stringResource(id = android.R.string.ok),
-                    modifier = Modifier.clickable {
-                        showDialog = false
-                    })
-            },
-            text = {
-                ShowQrCode(sub = "", port = port) {
+            properties = DialogProperties(
+                usePlatformDefaultWidth = !qrcodeHorLayout
+            ),
+        ) {
+            Surface(shape = RoundedCornerShape(8.dp)) {
+                ShowQrCode(sub = "", port = port, modifier = Modifier.padding(20.dp)) {
                     showDialog = false
                     sendText(it)
                 }
-            },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = false
-            ),
-        )
+            }
+        }
+    }
     if (errorDialogContent.isNotEmpty()) {
         val scrollState = rememberScrollState()
         AlertDialog(onDismissRequest = { errorDialogContent = "" }, confirmButton = {

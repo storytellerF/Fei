@@ -21,7 +21,7 @@ import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
-import io.ktor.server.engine.ApplicationEngine
+import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
@@ -47,7 +47,7 @@ sealed interface ServerState {
     data object Init : ServerState
     class Started(
         val port: Int,
-        val server: ApplicationEngine,
+        val server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>,
         val chatSession: DefaultClientWebSocketSession,
         val client: HttpClient,
         val channel: MutableSharedFlow<SseEvent>,
@@ -97,7 +97,7 @@ class FeiServer(feiService: FeiService) {
     private suspend fun setupServer(
         port: Int,
         client: HttpClient
-    ): Pair<NettyApplicationEngine, MutableSharedFlow<SseEvent>> {
+    ): Pair<EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>, MutableSharedFlow<SseEvent>> {
         channelWaitWorker = CompletableDeferred()
         clientRef = WeakReference(client)
         contextRef = WeakReference(context)
@@ -260,8 +260,13 @@ class FeiServer(feiService: FeiService) {
         println("emitRefreshEvent")
         val serverState = state.value
         if (serverState is ServerState.Started) {
-            val channel = serverState.channel
-            channel.emit(SseEvent("refresh"))
+            serverState.channel.emit(
+                SseEvent(
+                    "refresh",
+                    "message",
+                    System.currentTimeMillis().toString()
+                )
+            )
         }
     }
 
@@ -277,7 +282,7 @@ var clientRef: WeakReference<HttpClient>? = null
 fun Application.module() {
     val context = contextRef?.get()!!
     val client = clientRef?.get()!!
-    plugPlugins(context)
+    plugPlugins()
     channelWaitWorker?.complete(setupSse())
     configureRouting(context)
     webSocketsService()

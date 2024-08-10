@@ -10,3 +10,4 @@
 local.properties
 /.idea/inspectionProfiles/Project_Default.xml
 /.idea/deploymentTargetDropDown.xml
+.kotlin

@@ -8,36 +8,23 @@ import com.storyteller_f.fei.shares
 import io.ktor.http.ContentDisposition
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
+import io.ktor.server.http.content.staticResources
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondFile
-import io.ktor.server.routing.Route
+import io.ktor.server.routing.RootRouting
 import io.ktor.server.routing.get
-import io.ktor.server.thymeleaf.ThymeleafContent
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
-fun Route.contentRoute(context: Context) {
-    get("/") {
-        call.respond(
-            ThymeleafContent(
-                "index",
-                mapOf("shares" to List(shares.value.size) { index ->
-                    index.toString()
-                })
-            )
-        )
-    }
-    get("/messages") {
-        call.respond(ThymeleafContent("chat", mapOf()))
-    }
+fun RootRouting.contentRoute(context: Context) {
+    staticResources("/", null)
+
     get("/shares") {
         val encodeToString = Json.encodeToString(shares.value)
         call.respond(encodeToString)
     }
-
     get("/shares/{count}") {
         val index = call.parameters["count"]?.toInt() ?: return@get
         val info = shares.value.getOrNull(index)

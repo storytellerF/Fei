@@ -98,14 +98,12 @@ val mutex = Mutex()
 
 suspend fun Context.cacheInvalid() = withContext(Dispatchers.IO) {
     mutex.withLock {
-        cacheInvalidInternal()
+        val savedList = savedList()
+        val savedFiles = savedFiles()
+        val value = savedFiles + savedList
+        println(value.map { it.uri })
+        shares.emit(value)
     }
-}
-
-private suspend fun Context.cacheInvalidInternal(): Boolean {
-    val savedList = savedList()
-    val savedFiles = savedFiles()
-    return shares.tryEmit(savedFiles + savedList)
 }
 
 private suspend fun Context.savedFiles(): List<SharedFileInfo> = withContext(Dispatchers.IO) {

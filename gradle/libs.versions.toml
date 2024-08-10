@@ -15,8 +15,8 @@ datastore-preferences = "1.1.1"
 espresso-core = "3.6.1"
 junit = "4.13.2"
 kotlinx-coroutines = "1.8.1"
-ktor-client = "2.3.12"
-ktor-server = "2.3.12"
+ktor-client = "3.0.0-beta-2"
+ktor-server = "3.0.0-beta-2"
 leakcanary-android = "2.12"
 lifecycle-runtime-ktx = "2.8.4"
 logback-android = "3.0.0"
@@ -75,8 +75,8 @@ ktor-server-html-builder = { module = "io.ktor:ktor-server-html-builder", versio
 ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor-server" }
 ktor-server-partial-content = { module = "io.ktor:ktor-server-partial-content", version.ref = "ktor-server" }
 ktor-server-sessions = { module = "io.ktor:ktor-server-sessions", version.ref = "ktor-server" }
+ktor-server-sse = { module = "io.ktor:ktor-server-sse", version.ref = "ktor-server" }
 ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor-server" }
-ktor-server-thymeleaf = { module = "io.ktor:ktor-server-thymeleaf", version.ref = "ktor-server" }
 ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor-server" }
 leakcanary-android = { module = "com.squareup.leakcanary:leakcanary-android", version.ref = "leakcanary-android" }
 androidx-rules = { group = "androidx.test", name = "rules", version.ref = "rules" }
@@ -89,7 +89,7 @@ ktor-server = ["ktor-server-core", "ktor-server-netty", "ktor-server-auth",
     "ktor-server-content-negotiation", "ktor-server-host-common",
     "ktor-server-html-builder", "ktor-server-partial-content",
     "ktor-server-sessions", "ktor-server-status-pages",
-    "ktor-server-thymeleaf", "ktor-server-websockets", "ktor-serialization-kotlinx-json"]
+    "ktor-server-websockets", "ktor-serialization-kotlinx-json", "ktor-server-sse"]
 ktor-client = ["ktor-client-cio", "ktor-client-websockets", "ktor-client-logging", "ktor-client-core"]
 
 [plugins]

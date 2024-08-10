@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -29,15 +30,17 @@ class MainProvider : PreviewParameterProvider<List<SharedFileInfo>> {
 
 @Preview
 @Composable
-fun Main(
+fun SharedFiles(
     @PreviewParameter(MainProvider::class) infoList: List<SharedFileInfo>,
     deleteItem: (SharedFileInfo) -> Unit = {},
     saveToLocal: (SharedFileInfo) -> Unit = {},
     viewInfo: (SharedFileInfo) -> Unit = {},
 ) {
     LazyColumn(content = {
-        items(infoList.size) {
-            SharedFile(infoList[it], true, deleteItem, saveToLocal, viewInfo)
+        items(infoList, key = {
+            it.uri
+        }) {
+            SharedFile(it, true, deleteItem, saveToLocal, viewInfo)
         }
     })
 }
@@ -102,6 +105,6 @@ fun SharedFile(
 @Composable
 fun DefaultPreview() {
     FeiTheme {
-        Main(ShareFilePreviewProvider().values.toList())
+        SharedFiles(ShareFilePreviewProvider().values.toList())
     }
 }

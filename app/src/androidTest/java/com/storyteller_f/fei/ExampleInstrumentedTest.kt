@@ -13,6 +13,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.sse.SSE
+import io.ktor.client.plugins.sse.sseSession
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.request.headers
@@ -22,6 +24,11 @@ import io.ktor.http.parameters
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -100,44 +107,46 @@ class ExampleInstrumentedTest {
         }
     }
 
-//    @Test
-//    fun testSSE() {
-//        println("testSSE--")
-//        useSSE { fei, sseClient ->
-//            println("testSSE-- blocking")
-//            val deferred = async {
-//                sseClient.sseSession(urlString = "http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/sse").incoming.first {
-//                    println("testSSE-- receive $it")
-//                    it.event == "refresh"
-//                    true
-//                }
-//            }
-//            println("testSSE-- add uri")
-//            fei.appendUri("file:///test.zip".toUri())
-//            deferred.await()
-//        }
-//    }
+    @Test
+    fun testSSE() {
+        useSSE { fei, sseClient ->
+            val deferred = async {
+                val session = sseClient.sseSession(urlString = "http://${FeiService.LISTENER_ADDRESS}:${FeiService.DEFAULT_PORT}/sse")
+                try {
+                    session.incoming.first {
+                        it.data == "refresh"
+                    }
+                    session.cancel()
+                } catch (e: Exception) {
+                    session.cancel()
+                }
+            }
+            launch {
+                delay(1000)
+                fei.appendUri("file:///test.zip".toUri())
+            }
+            deferred.await()
+        }
+    }
 
-//    private fun useSSE(block: suspend CoroutineScope.(FeiService.Fei, sseClient: HttpClient) -> Unit) {
-//        useClient { fei, _, _, cookie ->
-//            println("testSSE-- client sse")
-//            HttpClient {
-//                install(SSE) {
-//                    showCommentEvents()
-//                    showRetryEvents()
-//                }
-//                install(Logging)
-//                defaultRequest {
-//                    headers {
-//                        append("cookie", cookie)
-//                    }
-//                }
-//            }.use {
-//                println("testSSE-- block")
-//                block(fei, it)
-//            }
-//        }
-//    }
+    private fun useSSE(block: suspend CoroutineScope.(FeiService.Fei, sseClient: HttpClient) -> Unit) {
+        useClient { fei, _, _, cookie ->
+            HttpClient {
+                install(SSE) {
+                    showCommentEvents()
+                    showRetryEvents()
+                }
+                install(Logging)
+                defaultRequest {
+                    headers {
+                        append("cookie", cookie)
+                    }
+                }
+            }.use {
+                block(fei, it)
+            }
+        }
+    }
 
     private fun useService(block: (FeiService.Fei, FeiService, FeiServer) -> Unit) {
         val serviceIntent = Intent(
@@ -176,7 +185,6 @@ class ExampleInstrumentedTest {
                             append("password", "")
                         }).headers["set-cookie"]!!
                     cookieMap["cookie"] = cookie
-                    println("testSSE-- cookie $cookie")
                     block(fei, it, service, cookie)
                 }
             }

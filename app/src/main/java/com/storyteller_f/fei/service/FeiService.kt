@@ -34,6 +34,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import java.io.File
 
 val Context.portFlow
@@ -258,7 +259,7 @@ class FeiService : LifecycleService() {
 
 data class SseEvent(val data: String, val event: String? = null, val id: String? = null)
 
-@kotlinx.serialization.Serializable
+@Serializable
 data class SharedFileInfo(val uri: String, val name: String)
 
 suspend fun ApplicationCall.respondSse(eventFlow: Flow<SseEvent>) {

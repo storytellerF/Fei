@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -62,7 +61,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -83,7 +81,7 @@ import com.storyteller_f.fei.service.portFlow
 import com.storyteller_f.fei.ui.components.ComposeBluetoothDevice
 import com.storyteller_f.fei.ui.components.FeiMainToolbar
 import com.storyteller_f.fei.ui.components.HidScreen
-import com.storyteller_f.fei.ui.components.Main
+import com.storyteller_f.fei.ui.components.SharedFiles
 import com.storyteller_f.fei.ui.components.MessagePage
 import com.storyteller_f.fei.ui.components.NavDrawer
 import com.storyteller_f.fei.ui.components.SafePage
@@ -91,7 +89,6 @@ import com.storyteller_f.fei.ui.components.SettingPage
 import com.storyteller_f.fei.ui.components.SharedFile
 import com.storyteller_f.fei.ui.components.ShowQrCode
 import com.storyteller_f.fei.ui.theme.FeiTheme
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -113,7 +110,10 @@ sealed class HidState {
     class Done(val device: ComposeBluetoothDevice) : HidState()
 }
 
+
 class MainActivity : ComponentActivity() {
+    private val fei = MutableStateFlow<FeiService.Fei?>(null)
+    private val currentFeiBinder get() = fei.value
     private val pickFile =
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uri ->
             addUri(uri)
@@ -130,8 +130,6 @@ class MainActivity : ComponentActivity() {
             NoOpBluetoothFei()
         }
     }
-    private val fei = MutableStateFlow<FeiService.Fei?>(null)
-    private val currentFeiBinder get() = fei.value
 
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -203,12 +201,22 @@ class MainActivity : ComponentActivity() {
 
             FeiTheme {
                 ModalNavigationDrawer(drawerContent = {
-                    Drawer(scope, drawerState, navController, showAboutWebView)
+                    Drawer(showAboutWebView, {
+                        scope.launch {
+                            drawerState.close()
+                        }
+                    }) {
+                        navController.navigate(it)
+                    }
                 }, drawerState = drawerState) {
                     Scaffold(topBar = {
-                        TopBar(port, sendText, scope, drawerState)
+                        TopBar(port, sendText) {
+                            scope.launch {
+                                drawerState.open()
+                            }
+                        }
                     }, floatingActionButton = {
-                        Floating(currentBackStackEntryAsState)
+                        Floating(currentBackStackEntryAsState?.destination?.route.orEmpty())
                     }, snackbarHost = {
                         SnackbarHost(hostState = snackBarHostState) { }
                     }) { paddingValues ->
@@ -265,7 +273,6 @@ class MainActivity : ComponentActivity() {
         sendText: (String) -> Unit,
         state: HidState
     ) {
-        val infoList by shares.collectAsState()
         Surface(
             modifier = Modifier
                 .fillMaxSize()
@@ -274,22 +281,19 @@ class MainActivity : ComponentActivity() {
         ) {
             NavHost(navController = navController, startDestination = "main") {
                 navPages(
-                    infoList,
-                    navController,
                     port,
                     state,
                     ::saveToLocal,
                     ::deleteItem,
                     sendText,
                     ::requestPermission
-                )
+                ) { i -> navController.navigate("info/$i") }
             }
         }
     }
 
     @Composable
-    private fun Floating(currentBackStackEntryAsState: NavBackStackEntry?) {
-        val text = currentBackStackEntryAsState?.destination?.route.orEmpty()
+    private fun Floating(text: String) {
         if (text != "messages")
             FloatingActionButton(onClick = {
                 pickFile.launch(arrayOf("*/*"))
@@ -303,20 +307,15 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun Drawer(
-        scope: CoroutineScope,
-        drawerState: DrawerState,
-        navController: NavHostController,
-        showAboutWebView: () -> Unit
+        showAboutWebView: () -> Unit,
+        closeDrawer: () -> Unit,
+        navigateTo: (String) -> Unit
     ) {
         ModalDrawerSheet {
             Spacer(Modifier.height(12.dp))
             NavDrawer({
-                scope.launch {
-                    drawerState.close()
-                }
-            }, {
-                navController.navigate(it)
-            }, showAboutWebView)
+                closeDrawer()
+            }, navigateTo, showAboutWebView)
         }
     }
 
@@ -324,19 +323,14 @@ class MainActivity : ComponentActivity() {
     private fun TopBar(
         port: Int,
         sendText: (String) -> Unit,
-        scope: CoroutineScope,
-        drawerState: DrawerState
+        openDrawer: () -> Unit
     ) {
         FeiMainToolbar(
             port.toString(),
             { currentFeiBinder?.restart() },
             { currentFeiBinder?.stop() },
             sendText,
-            {
-                scope.launch {
-                    drawerState.open()
-                }
-            },
+            openDrawer,
             {
                 shares.value.forEach(::deleteItem)
             },
@@ -364,19 +358,19 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun NavGraphBuilder.navPages(
-        infoList: List<SharedFileInfo>,
-        navController: NavHostController,
         port: Int,
         state: HidState,
         saveToLocal: (SharedFileInfo) -> Unit,
         deleteItem: (SharedFileInfo) -> Unit,
         sendText: (String) -> Unit,
-        requestPermission: () -> Unit
+        requestPermission: () -> Unit,
+        navigateToInfo: (Int) -> Unit
     ) {
         composable("main") {
-            Main(infoList, deleteItem, saveToLocal) {
+            val infoList by shares.collectAsState()
+            SharedFiles(infoList, deleteItem, saveToLocal) {
                 val i = shares.value.indexOf(it)
-                navController.navigate("info/$i")
+                navigateToInfo(i)
             }
         }
         composable("info/{index}", arguments = listOf(navArgument("index") {
