@@ -203,3 +203,7 @@
 -dontwarn com.android.tools.lint.detector.api.Issue
 -dontwarn com.android.tools.lint.detector.api.Scope
 -dontwarn com.android.tools.lint.detector.api.Severity
+
+-dontwarn com.github.luben.zstd.ZstdInputStreamNoFinalizer
+-dontwarn com.github.luben.zstd.util.Native
+-dontwarn org.osgi.annotation.bundle.Export
