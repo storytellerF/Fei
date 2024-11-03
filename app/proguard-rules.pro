@@ -1,6 +1,6 @@
 # Add project specific ProGuard rules here.
 # You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# proguardFiles setting in build.gradle.kts.
 #
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
@@ -188,10 +188,6 @@
 # If there is no `java.lang.ClassValue` (for example, in Android), then R8/ProGuard will print a warning.
 # However, since in this case they will not be used, we can disable these warnings
 -dontwarn kotlinx.serialization.internal.ClassValueReferences
-
-# Ktor
--keep class io.ktor.** { *; }
--keep class io.netty.** { *; }
 
 -dontwarn com.android.tools.lint.client.api.IssueRegistry
 -dontwarn com.android.tools.lint.client.api.Vendor

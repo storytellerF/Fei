@@ -1,0 +1,168 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.starter.easylauncher") version "6.3.0"
+    alias(libs.plugins.compose.compiler)
+}
+
+fun getenv(key: String): String? {
+    return System.getenv(key) ?: System.getenv(key.uppercase())
+}
+
+val signPath: String? = getenv("storyteller_f_sign_path")
+val signKey: String? = getenv("storyteller_f_sign_key")
+val signAlias: String? = getenv("storyteller_f_sign_alias")
+val signStorePassword: String? = getenv("storyteller_f_sign_store_password")
+val signKeyPassword: String? = getenv("storyteller_f_sign_key_password")
+val generatedJksFile = layout.buildDirectory.file("signing/signing_key.jks").get().asFile
+
+android {
+    namespace = "com.storyteller_f.fei"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.storyteller_f.fei"
+        minSdk = 21
+        targetSdk = 35
+        versionCode = 8
+        versionName = "1.8"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        val signStorePath = when {
+            signPath != null -> File(signPath)
+            signKey != null -> generatedJksFile
+            else -> null
+        }
+        if (signStorePath != null && signAlias != null && signStorePassword != null && signKeyPassword != null) {
+            create("release") {
+                keyAlias = signAlias
+                keyPassword = signKeyPassword
+                storeFile = signStorePath
+                storePassword = signStorePassword
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            resValue(
+                "string",
+                "leak_canary_display_activity_label",
+                "Fei"
+            )
+        }
+
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            val releaseSignConfig = signingConfigs.findByName("release")
+            if (releaseSignConfig != null)
+                signingConfig = releaseSignConfig
+        }
+    }
+    val javaVersion = JavaVersion.VERSION_21
+    compileOptions {
+        sourceCompatibility = javaVersion
+        targetCompatibility = javaVersion
+    }
+    kotlinOptions {
+        jvmTarget = javaVersion.toString()
+    }
+    buildFeatures {
+        compose = true
+    }
+
+    packaging {
+        resources {
+            excludes += ("/META-INF/{AL2.0,LGPL2.1}")
+            pickFirsts += listOf("META-INF/*", "/META-INF/io.netty.versions.properties")
+        }
+        jniLibs {
+            pickFirsts += "META-INF/*"
+        }
+    }
+    splits {
+
+        // Configures multiple APKs based on ABI.
+        abi {
+            isEnable = true
+            reset()
+            include("x86", "x86_64", "arm64-v8a", "armeabi-v7a")
+            isUniversalApk = true
+        }
+    }
+}
+
+dependencies {
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.service)
+
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.tooling.preview)
+    testImplementation(libs.androidx.rules)
+    implementation(libs.androidx.adaptive.android)
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
+
+    implementation(libs.androidx.material3)
+    debugImplementation(libs.androidx.customview)
+    debugImplementation(libs.androidx.customview.poolingcontainer)
+
+    implementation(libs.accompanist.systemuicontroller)
+    implementation(libs.accompanist.permissions)
+
+    implementation(libs.androidx.navigation.compose)
+
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+
+    //ktor
+    implementation(libs.bundles.ktor.server)
+    implementation(libs.bundles.ktor.client)
+
+    implementation(libs.bundles.coruntines)
+
+
+    implementation(libs.logback.android)
+    implementation(libs.zxing.core)
+
+    implementation(libs.compose.prefs3)
+    implementation(libs.androidx.datastore.preferences)
+
+    implementation(libs.androidx.webkit)
+    implementation(libs.androidx.browser)
+
+    implementation(libs.androidx.core.splashscreen)
+    debugImplementation(libs.leakcanary.android)
+
+    val baoFolder = project.findProperty("baoFolder")
+    val baoModule = findProject(":bao:startup")
+    if (baoFolder == "local" && baoModule != null)
+        implementation(baoModule)
+    else
+        implementation("com.github.storytellerF.Bao:startup:e978cf52f2")
+
+    val yongFolder = project.findProperty("yongFolder")
+    val yongModule = findProject(":yong:library")
+    if (yongFolder == "local" && yongModule != null) {
+        testImplementation(yongModule)
+    }
+    implementation(libs.compose.markdown)
+    implementation(libs.coil.compose)
+}
