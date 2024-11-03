@@ -207,3 +207,5 @@
 -dontwarn com.github.luben.zstd.ZstdInputStreamNoFinalizer
 -dontwarn com.github.luben.zstd.util.Native
 -dontwarn org.osgi.annotation.bundle.Export
+
+-dontwarn com.sun.nio.file.SensitivityWatchEventModifier

@@ -12,13 +12,13 @@ import io.ktor.server.http.content.staticResources
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondFile
-import io.ktor.server.routing.RootRouting
+import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 
-fun RootRouting.contentRoute(context: Context) {
+fun Route.contentRoute(context: Context) {
     staticResources("/", null)
 
     get("/shares") {

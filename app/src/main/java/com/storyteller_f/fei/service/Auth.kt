@@ -7,7 +7,6 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
-import io.ktor.server.auth.Principal
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.form
@@ -24,7 +23,7 @@ import kotlinx.serialization.Serializable
 import java.util.UUID
 
 @Serializable
-data class UserSession(val name: String) : Principal
+data class UserSession(val name: String)
 
 fun Application.configureRouting(context: Context) {
     install(Authentication) {

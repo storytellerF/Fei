@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace 'com.storyteller_f.fei'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.storyteller_f.fei"
         minSdk 21
-        targetSdk 34
+        targetSdk 35
         versionCode 8
         versionName "1.8"
 
@@ -97,7 +97,7 @@ dependencies {
 
     implementation libs.androidx.ui
     implementation libs.androidx.ui.tooling.preview
-    implementation libs.androidx.rules
+    testImplementation libs.androidx.rules
     implementation libs.androidx.adaptive.android
     androidTestImplementation libs.androidx.ui.test.junit4
     debugImplementation libs.androidx.ui.tooling

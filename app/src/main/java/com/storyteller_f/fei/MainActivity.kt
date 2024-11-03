@@ -46,7 +46,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -494,12 +493,10 @@ class CustomTabConnection(activity: MainActivity) : CustomTabsServiceConnection(
 
 @Composable
 fun Info(i: Int, port: String, sendText: (String) -> Unit) {
-    val t by produceState(initialValue = SharedFileInfo("", ""), i, shares) {
-        value = shares.value[i]
-    }
+    val currentShares by shares.collectAsState()
 
     Column {
-        SharedFile(info = t)
+        SharedFile(info = currentShares[i])
         ShowQrCode("shares/$i", port, Modifier.padding(top = 20.dp), sendText)
     }
 

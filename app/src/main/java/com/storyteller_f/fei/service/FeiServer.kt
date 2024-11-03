@@ -7,6 +7,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.websocket.DefaultClientWebSocketSession
 import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.pingInterval
 import io.ktor.client.plugins.websocket.receiveDeserialized
 import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.client.request.request
@@ -40,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import java.lang.ref.WeakReference
+import kotlin.time.Duration.Companion.seconds
 
 var channelWaitWorker: CompletableDeferred<MutableSharedFlow<SseEvent>>? = null
 
@@ -143,7 +145,7 @@ class FeiServer(feiService: FeiService) {
     private fun httpClient(): HttpClient {
         return HttpClient(CIO) {
             install(WebSockets) {
-                pingInterval = 20_000
+                pingInterval = 20.seconds
                 contentConverter = KotlinxWebsocketSerializationConverter(Json)
             }
         }
