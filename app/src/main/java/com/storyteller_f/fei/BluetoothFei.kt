@@ -29,6 +29,7 @@ import com.storyteller_f.fei.ui.components.ComposeBluetoothDevice
 
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
+import java.lang.ref.WeakReference
 
 interface BluetoothFeiService {
     fun refreshBondDevices()
@@ -68,13 +69,14 @@ class NoOpBluetoothFei : BluetoothFeiService {
 }
 
 @RequiresApi(Build.VERSION_CODES.P)
-class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
+class BluetoothFei(activity: MainActivity) : BluetoothFeiService {
+    private val context = WeakReference(activity)
     private val bluetoothManager: BluetoothManager =
-        context.getSystemService(BluetoothManager::class.java)
+        activity.getSystemService(BluetoothManager::class.java)
     private val adapter = bluetoothManager.adapter
     private var bluetoothState by mutableStateOf(adapter?.isEnabled ?: false)
     private var bondDevices by mutableStateOf(
-        context.alreadyBondedDevices(bluetoothManager)
+        activity.alreadyBondedDevices(bluetoothManager)
     )
     private var bluetoothPermissionIndex by mutableIntStateOf(0)
 
@@ -93,7 +95,7 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
                 val bluetoothHidDevice = p1 as BluetoothHidDevice
                 hidDevice = bluetoothHidDevice
                 if (!hidRegistered) {
-                    context.registerAsHid(bluetoothHidDevice, registerCallback)
+                    context.get()?.registerAsHid(bluetoothHidDevice, registerCallback)
                 }
             }
         }
@@ -124,6 +126,7 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
 
     override fun start() {
         Log.d(TAG, "start() called $hidRegistered $hidDevice")
+        val context = context.get() ?: return
         adapter?.getProfileProxy(
             context,
             bluetoothProfileConnection,
@@ -193,8 +196,10 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
             connecting,
         ) {
             val connected = connectedDevice
+            val context = context.get()
             value = when {
                 Build.VERSION.SDK_INT < Build.VERSION_CODES.P -> HidState.NotSupport
+                context == null -> HidState.NotSupport
                 !bluetoothState -> HidState.BluetoothOff
                 !context.permissionOk() -> HidState.NoPermission
                 connected == null -> HidState.NoBond(bondDevices.map {
@@ -212,6 +217,7 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
     }
 
     override fun connectDevice(address: String): Boolean {
+        val context = context.get() ?: return false
         val result = context.connectDevice(hidDevice, bondDevices, address)
         when (result) {
             is BluetoothAction.Done -> if (!result.result) showShortToast(result.message)
@@ -221,10 +227,12 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
         return (result as? BluetoothAction.Done)?.result == true
     }
 
-    private fun showShortToast(message: String) =
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    private fun showShortToast(message: String) = context.get().let {
+        Toast.makeText(it, message, Toast.LENGTH_SHORT).show()
+    }
 
     override fun disconnectDevice(address: String): Boolean {
+        val context = context.get() ?: return false
         return context.disconnectDevice(hidDevice, bondDevices, address)
     }
 
@@ -238,6 +246,7 @@ class BluetoothFei(val context: MainActivity) : BluetoothFeiService {
     }
 
     override fun refreshBondDevices() {
+        val context = context.get() ?: return
         bondDevices += context.alreadyBondedDevices(bluetoothManager)
     }
 
