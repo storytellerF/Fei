@@ -1,3 +1,7 @@
+import com.google.gson.stream.JsonWriter
+import java.io.File
+import java.io.FileWriter
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -165,4 +169,65 @@ dependencies {
     }
     implementation(libs.compose.markdown)
     implementation(libs.coil.compose)
+}
+
+data class DependencyInfo(val group: String, val name: String, val version: String, val children: MutableList<DependencyInfo> = mutableListOf())
+
+if (project.findProperty("report_deps") == "true") {
+    project.afterEvaluate {
+        val root = layout.buildDirectory.dir("reports/deps").get()
+        val outputFile = layout.buildDirectory.file("reports/deps/dependencies.json").get().asFile
+        root.asFile.let {
+            if (!(it.exists())) it.mkdir()
+        }
+        FileWriter(outputFile).use { writer ->
+            JsonWriter(writer).use { jsonWriter ->
+                jsonWriter.beginObject()
+                configurations.filter {
+                    it.isCanBeResolved
+                }.forEach { configuration ->
+                    val firstLevelModuleDependencies =
+                        configuration.resolvedConfiguration.firstLevelModuleDependencies
+                    if (firstLevelModuleDependencies.isNotEmpty() && !configuration.name.startsWith("_internal")) {
+                        val newDir = root.dir(configuration.name)
+                        newDir.asFile.let {
+                            if (!(it.exists())) it.mkdir()
+                        }
+                        jsonWriter.name(configuration.name)
+                        jsonWriter.beginArray()
+                        firstLevelModuleDependencies.forEach { module ->
+                            buildDependencyTree(module, jsonWriter, newDir)
+                        }
+                        jsonWriter.endArray()
+                    }
+                }
+                jsonWriter.endObject()
+            }
+
+        }
+        println("Dependencies exported to ${outputFile.absolutePath}")
+    }
+}
+
+private fun buildDependencyTree(
+    module: ResolvedDependency,
+    jsonWriter: JsonWriter,
+    newDir: Directory
+) {
+    val childDir = newDir.dir("${module.moduleGroup}(${module.moduleName})[${module.moduleVersion}]")
+    childDir.asFile.let {
+        if (!it.exists()) it.mkdir()
+    }
+    jsonWriter.beginObject()
+    jsonWriter.name("group").value(module.moduleGroup)
+    jsonWriter.name("name").value(module.moduleName)
+    jsonWriter.name("version").value(module.moduleVersion)
+    jsonWriter.name("children")
+    jsonWriter.beginArray()
+    // 遍历间接依赖
+    module.children.forEach { childModule ->
+        buildDependencyTree(childModule, jsonWriter, childDir)
+    }
+    jsonWriter.endArray()
+    jsonWriter.endObject()
 }
