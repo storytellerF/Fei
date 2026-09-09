@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Build
@@ -139,6 +140,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val requestLocalNetworkPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            startAppService()
+        } else {
+            Toast.makeText(this, "需要局域网访问权限才能启动服务", Toast.LENGTH_LONG).show()
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val serverState = serviceBinder.flatMapLatest {
         it?.service?.server?.state ?: MutableStateFlow(ServerState.Init)
@@ -230,10 +241,25 @@ class MainActivity : ComponentActivity() {
 
             }
         }
+        startAppServiceWhenPermitted()
+        CustomTabsClient.bindCustomTabsService(this, CUSTOM_TAB_PACKAGE_NAME, chromeConnection)
+    }
+
+    private fun startAppServiceWhenPermitted() {
+        if (
+            Build.VERSION.SDK_INT >= 37 &&
+            checkSelfPermission(Manifest.permission.ACCESS_LOCAL_NETWORK) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestLocalNetworkPermission.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        } else {
+            startAppService()
+        }
+    }
+
+    private fun startAppService() {
         val intent = Intent(this, AppService::class.java)
         startService(intent)
         if (currentServiceBinder == null) bindService(intent, serviceConnection, 0)
-        CustomTabsClient.bindCustomTabsService(this, CUSTOM_TAB_PACKAGE_NAME, chromeConnection)
     }
 
     @RequiresApi(Build.VERSION_CODES.TIRAMISU)

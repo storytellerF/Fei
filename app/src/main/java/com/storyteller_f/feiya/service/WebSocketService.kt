@@ -31,7 +31,7 @@ fun Application.webSocketsService() {
         contentConverter = KotlinxWebsocketSerializationConverter(Json)
     }
     routing {
-        val connections = Collections.synchronizedSet<Connection?>(LinkedHashSet())
+        val connections = Collections.synchronizedSet<Connection>(LinkedHashSet())
         webSocket("/chat") {
             println("Adding user!")
             val thisConnection = Connection(this)

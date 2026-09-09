@@ -1,5 +1,4 @@
 import com.google.gson.stream.JsonWriter
-import java.io.File
 import java.io.FileWriter
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -11,6 +10,7 @@ plugins {
 }
 
 val signPath: String? = System.getenv("storyteller_f_sign_path")
+val signFile = signPath?.let(rootProject::file)
 val signAlias: String? = System.getenv("storyteller_f_sign_alias")
 val signStorePassword: String? = System.getenv("storyteller_f_sign_store_password")
 val signKeyPassword: String? = System.getenv("storyteller_f_sign_key_password")
@@ -18,12 +18,12 @@ val javaVersion = JavaVersion.VERSION_21
 
 android {
     namespace = "com.storyteller_f.feiya"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.storyteller_f.feiya"
-        minSdk = 21
-        targetSdk = 35
+        minSdk = 24
+        targetSdk = 37
         versionCode = 8
         versionName = "1.8"
 
@@ -34,11 +34,11 @@ android {
     }
 
     signingConfigs {
-        if (signPath != null && signAlias != null && signStorePassword != null && signKeyPassword != null) {
+        if (signFile != null && signAlias != null && signStorePassword != null && signKeyPassword != null) {
             create("release") {
                 keyAlias = signAlias
                 keyPassword = signKeyPassword
-                storeFile = File(signPath)
+                storeFile = signFile
                 storePassword = signStorePassword
             }
         }
